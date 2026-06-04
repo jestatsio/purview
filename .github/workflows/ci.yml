@@ -36,10 +36,10 @@ jobs:
       PURVIEW_TEST_POSTGRES_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/purview_test
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v8.2.0
         with:
           python-version: ${{ matrix.python-version }}
 
