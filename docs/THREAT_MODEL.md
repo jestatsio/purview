@@ -6,7 +6,7 @@ what is and isn't enforced, and maps each guarantee to the test that proves it.
 
 ## Trust boundary: the session
 
-A request binds exactly one [`Context`](../src/purview/core/context.py) (user +
+A request binds exactly one [`Context`](https://github.com/jestatsio/purview/blob/main/src/purview/core/context.py) (user +
 tenant + roles) to its SQLAlchemy session. **The session is the boundary.** Every
 guarantee below assumes:
 
@@ -63,5 +63,5 @@ governs models that have no rule of their own.
 
 ## Reporting
 
-Found a way to cross the boundary? See [SECURITY.md](../SECURITY.md). The in-scope
+Found a way to cross the boundary? See [SECURITY.md](https://github.com/jestatsio/purview/blob/main/SECURITY.md). The in-scope
 definition there matches this document.

@@ -43,8 +43,14 @@ dev = [
   "mypy>=1.11",
   "ruff>=0.6",
 ]
+docs = [
+  "mkdocs-material>=9.5",
+  "mkdocstrings[python]>=0.26",
+  "fastapi>=0.110",
+]
 
 [project.urls]
+Documentation = "https://jestatsio.github.io/purview/"
 Homepage = "https://github.com/jestatsio/purview"
 Repository = "https://github.com/jestatsio/purview"
 Issues = "https://github.com/jestatsio/purview/issues"
