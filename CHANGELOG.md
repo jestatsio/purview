@@ -19,6 +19,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **FastAPI adapter** (`purview.fastapi`): `context_binder`, the `requires` route
   guard, `authorize_or_403`, and a `PurviewForbidden`/`CrossTenantWrite` → 403
   handler.
+- `install(..., strict=True)` for within-tenant default deny: a scoped model with
+  no read rule denies instead of defaulting to tenant-scope-only.
 - Test suite: unit (100% branch coverage on the combinator), integration
   (parametrized over SQLite and Postgres), an adversarial leak suite, and a
   runnable FastAPI example app.

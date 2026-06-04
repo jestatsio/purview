@@ -110,6 +110,12 @@ runtime.
 actions are instance-level checks; `update`/`delete` reuse the `read` predicate
 unless you register a stricter rule for them.
 
+**Within-tenant default.** A scoped model with *no* read rule is visible
+tenant-wide (tenant isolation still applies). Pass `install(..., strict=True)` to
+flip this to within-tenant **default deny** — every model then needs an explicit
+rule to grant any access. The cross-tenant boundary is enforced identically in
+both modes.
+
 ## The enforcement boundary
 
 Inside the boundary: ORM `select`s, `session.get`, relationship loads, and flushes

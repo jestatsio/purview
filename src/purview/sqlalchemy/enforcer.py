@@ -45,10 +45,14 @@ class Purview:
         base: Any,
         *,
         tenant_column: str = "tenant_id",
+        strict: bool = False,
         session_class: type[Session] = Session,
     ) -> None:
         self.policy = policy
         self.tenant_column = tenant_column
+        # strict=True denies reads of a scoped model that has no read rule, rather
+        # than defaulting it to tenant-scope-only (within-tenant default deny).
+        self.strict = strict
         # Secure-by-default: raises if any non-global model lacks the tenant column.
         self.scoped: list[type] = discover_scoped(base, policy, tenant_column)
         self._session_class = session_class
@@ -59,7 +63,7 @@ class Purview:
         """Wire the read/write guards onto the session class (idempotent)."""
         if self._read is not None:
             return self
-        self._read = make_read_guard(self.policy, self.scoped, self.tenant_column)
+        self._read = make_read_guard(self.policy, self.scoped, self.tenant_column, self.strict)
         self._write = make_write_guard(self.policy, self.scoped, self.tenant_column)
         event.listen(self._session_class, "do_orm_execute", self._read)
         event.listen(self._session_class, "before_flush", self._write)
@@ -85,7 +89,13 @@ class Purview:
     async def authorize(self, session: AsyncSession, action: str, resource: object) -> bool:
         """Whether the bound actor may perform ``action`` on ``resource``."""
         return await exists_check(
-            session, self.policy, self._ctx(session), action, resource, self.tenant_column
+            session,
+            self.policy,
+            self._ctx(session),
+            action,
+            resource,
+            self.tenant_column,
+            self.strict,
         )
 
     async def authorized_ids(
@@ -97,7 +107,14 @@ class Purview:
     ) -> list[Any]:
         """The subset of ``ids`` the bound actor may perform ``action`` on."""
         return await batch_check(
-            session, self.policy, self._ctx(session), action, model, ids, self.tenant_column
+            session,
+            self.policy,
+            self._ctx(session),
+            action,
+            model,
+            ids,
+            self.tenant_column,
+            self.strict,
         )
 
     def validate_create(self, session: _SessionLike, resource: object) -> bool:
@@ -118,13 +135,21 @@ def install(
     policy: Policy,
     *,
     tenant_column: str = "tenant_id",
+    strict: bool = False,
     session_class: type[Session] = Session,
 ) -> Purview:
     """Discover scoped models, wire the guards, and return the enforcer.
+
+    Set ``strict=True`` to deny reads of a scoped model that has no read rule
+    (within-tenant default deny) instead of defaulting it to tenant-scope-only.
 
     Raises :class:`~purview.exceptions.UnscopedModel` if a non-global model lacks
     the tenant column.
     """
     return Purview(
-        policy, base, tenant_column=tenant_column, session_class=session_class
+        policy,
+        base,
+        tenant_column=tenant_column,
+        strict=strict,
+        session_class=session_class,
     ).install()

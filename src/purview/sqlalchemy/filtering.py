@@ -23,6 +23,7 @@ def authorized_select(
     ctx: Context[Any, Any],
     model: type,
     tenant_column: str,
+    strict: bool = False,
 ) -> Select[Any]:
     """A ``select(model)`` narrowed to the rows ``ctx`` may read.
 
@@ -31,5 +32,5 @@ def authorized_select(
     """
     return select(model).where(
         tenant_predicate(model, tenant_column, ctx.tenant_id),
-        row_predicate(policy, ctx, model, READ),
+        row_predicate(policy, ctx, model, READ, strict),
     )

@@ -33,12 +33,18 @@ def row_predicate(
     ctx: Context[Any, Any],
     model: type,
     action: str,
+    strict: bool = False,
 ) -> ColumnElement[bool]:
-    """The fine-grained predicate for ``(model, action)`` (``true()`` if unruled)."""
+    """The fine-grained predicate for ``(model, action)``.
+
+    With no rule for the governing action, the row layer is open (``true()``) by
+    default, or denied (``false()``) under ``strict`` — tenant scope applies
+    either way.
+    """
     gov = governing_action(policy, model, action)
     if policy.has_rules(model, gov):
         return evaluate_predicate(policy, ctx, model, gov)
-    return true()
+    return false() if strict else true()
 
 
 def tenant_predicate(
@@ -51,11 +57,18 @@ def tenant_predicate(
     return predicate
 
 
-def grants(policy: Policy, ctx: Context[Any, Any], model: type, action: str) -> bool:
+def grants(
+    policy: Policy,
+    ctx: Context[Any, Any],
+    model: type,
+    action: str,
+    strict: bool = False,
+) -> bool:
     """Whether ``ctx`` has any standing grant for ``(model, action)``.
 
-    True unless the row predicate is statically ``false()`` (no granting role). A
-    coarse gate for route guards — it does not consider tenant scope or specific
-    rows, only whether the actor could ever be permitted.
+    True unless the row predicate is statically ``false()`` (no granting role,
+    or — under ``strict`` — no rule at all). A coarse gate for route guards: it
+    does not consider tenant scope or specific rows, only whether the actor could
+    ever be permitted.
     """
-    return not isinstance(row_predicate(policy, ctx, model, action), _FALSE_TYPE)
+    return not isinstance(row_predicate(policy, ctx, model, action, strict), _FALSE_TYPE)

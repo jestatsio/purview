@@ -36,7 +36,7 @@ def requires(
     """
 
     async def guard(context: Context[Any, Any] = Depends(context_dependency)) -> None:
-        if not grants(pv.policy, context, resource_type, action):
+        if not grants(pv.policy, context, resource_type, action, pv.strict):
             raise PurviewForbidden(f"not permitted to {action} {resource_type.__name__}")
 
     return guard

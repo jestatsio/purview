@@ -35,6 +35,7 @@ async def exists_check(
     action: str,
     resource: object,
     tenant_column: str,
+    strict: bool = False,
 ) -> bool:
     """Whether ``ctx`` may perform ``action`` on the single ``resource`` row."""
     model = type(resource)
@@ -45,7 +46,7 @@ async def exists_check(
         .where(
             *pk_match,
             tenant_predicate(model, tenant_column, ctx.tenant_id),
-            row_predicate(policy, ctx, model, action),
+            row_predicate(policy, ctx, model, action, strict),
         )
     )
     with _suppress():  # the predicate is self-contained; don't let the guard re-add criteria
@@ -60,6 +61,7 @@ async def batch_check(
     model: type,
     ids: Iterable[Any],
     tenant_column: str,
+    strict: bool = False,
 ) -> list[Any]:
     """The subset of ``ids`` of ``model`` that ``ctx`` may perform ``action`` on."""
     pk_cols = _primary_key_columns(model)
@@ -69,7 +71,7 @@ async def batch_check(
     stmt = select(pk).where(
         pk.in_(list(ids)),
         tenant_predicate(model, tenant_column, ctx.tenant_id),
-        row_predicate(policy, ctx, model, action),
+        row_predicate(policy, ctx, model, action, strict),
     )
     with _suppress():
         return list(await session.scalars(stmt))
