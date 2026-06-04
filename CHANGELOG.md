@@ -8,6 +8,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Docs**: a [threat model](docs/THREAT_MODEL.md) (each guarantee mapped to its
+  test) and a [migrating-from-Oso guide](docs/MIGRATING_FROM_OSO.md).
 - **Fine-grained `create` rules**: `@policy.create_rule(Model)` runs a plain
   `(ctx, proposed_obj) -> bool` predicate at `validate_create` time — create has no
   row to filter, so it is a type-checked Python predicate over the proposed object.

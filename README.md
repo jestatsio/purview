@@ -168,6 +168,14 @@ async def edit(post_id: int, session: AsyncSession = Depends(bound)):
 See [`tests/examples/test_blog_app.py`](tests/examples/test_blog_app.py) for a
 complete, runnable app.
 
+## Documentation
+
+- [Design](docs/DESIGN.md) — the architecture and the keystone idea.
+- [Threat model](docs/THREAT_MODEL.md) — what is and isn't enforced, each guarantee
+  mapped to the test that proves it.
+- [Migrating from Oso](docs/MIGRATING_FROM_OSO.md).
+- [Security policy](SECURITY.md) · [Contributing](CONTRIBUTING.md) · [Releasing](RELEASING.md).
+
 ## How it compares
 
 |                          | Purview | Oso (OSS) | Cerbos | Casbin |
