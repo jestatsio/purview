@@ -29,7 +29,7 @@ from models import (
     build_policy,
 )
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.pool import NullPool, StaticPool
 
 from purview import Context
 from purview.sqlalchemy import Purview, install
@@ -95,7 +95,9 @@ async def env(request: pytest.FixtureRequest) -> AsyncIterator[Env]:
             url, poolclass=StaticPool, connect_args={"check_same_thread": False}
         )
     else:
-        engine = create_async_engine(url)
+        # NullPool: don't retain asyncpg connections past the test's event loop,
+        # which otherwise emits "Event loop is closed" warnings on teardown.
+        engine = create_async_engine(url, poolclass=NullPool)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
