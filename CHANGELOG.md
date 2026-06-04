@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-04
+
 ### Added
 
 - **Docs**: a [threat model](docs/THREAT_MODEL.md) (each guarantee mapped to its
@@ -70,6 +72,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (parametrized over SQLite and Postgres), an adversarial leak suite, and a
   runnable FastAPI example app.
 
-[Unreleased]: https://github.com/jestatsio/purview/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/jestatsio/purview/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/jestatsio/purview/releases/tag/v0.2.0
 [0.1.1]: https://github.com/jestatsio/purview/releases/tag/v0.1.1
 [0.1.0]: https://github.com/jestatsio/purview/releases/tag/v0.1.0
