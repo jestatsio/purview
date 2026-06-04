@@ -3,6 +3,7 @@
 [![CI](https://github.com/jestatsio/purview/actions/workflows/ci.yml/badge.svg)](https://github.com/jestatsio/purview/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/purview-authz)](https://pypi.org/project/purview-authz/)
 [![Python](https://img.shields.io/pypi/pyversions/purview-authz)](https://pypi.org/project/purview-authz/)
+[![Docs](https://img.shields.io/badge/docs-jestatsio.github.io-blue)](https://jestatsio.github.io/purview/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 **Row-level authorization and multi-tenancy for FastAPI + SQLAlchemy.** Define a
@@ -169,6 +170,8 @@ See [`tests/examples/test_blog_app.py`](tests/examples/test_blog_app.py) for a
 complete, runnable app.
 
 ## Documentation
+
+**Full docs: https://jestatsio.github.io/purview/**
 
 - [Design](docs/DESIGN.md) — the architecture and the keystone idea.
 - [Threat model](docs/THREAT_MODEL.md) — what is and isn't enforced, each guarantee
