@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
 name = "purview-authz"
-version = "0.1.0.dev0"
+dynamic = ["version"]
 description = "Row-level authorization and multi-tenancy for FastAPI + SQLAlchemy: define a policy once as column expressions and get both yes/no checks and query filtering from the same rule."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -47,6 +47,9 @@ dev = [
 Homepage = "https://github.com/erichare/purview"
 Repository = "https://github.com/erichare/purview"
 Issues = "https://github.com/erichare/purview/issues"
+
+[tool.hatch.version]
+source = "vcs"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/purview"]

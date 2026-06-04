@@ -10,6 +10,8 @@ core stays free of those concerns.
 
 from __future__ import annotations
 
+from importlib.metadata import PackageNotFoundError, version
+
 from purview.core.actions import CREATE, DELETE, READ, UPDATE, Action
 from purview.core.context import Context
 from purview.core.registry import Policy
@@ -21,7 +23,10 @@ from purview.exceptions import (
     UnscopedModel,
 )
 
-__version__ = "0.1.0.dev0"
+try:
+    __version__ = version("purview-authz")
+except PackageNotFoundError:  # pragma: no cover - running from a source tree
+    __version__ = "0.0.0+unknown"
 
 __all__ = [
     "CREATE",

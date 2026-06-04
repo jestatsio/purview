@@ -193,6 +193,9 @@ uv run --extra dev ruff check .
 Postgres fidelity is exercised in CI; set `PURVIEW_TEST_POSTGRES_URL` to run the
 integration matrix against a local Postgres too.
 
+Releases publish to PyPI on a version tag via Trusted Publishing (no stored token);
+the version is derived from the tag. See [RELEASING.md](RELEASING.md).
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
