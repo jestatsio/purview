@@ -124,7 +124,8 @@ class Purview:
 
     def validate_create(self, session: _SessionLike, resource: object) -> bool:
         """Whether ``resource`` may be created in the bound actor's tenant."""
-        return _validate_create(self._ctx(session), resource, self.tenant_column)
+        column = self.policy.tenant_field_for(type(resource), self.tenant_column)
+        return _validate_create(self._ctx(session), resource, column)
 
     def _ctx(self, session: _SessionLike) -> Context[Any, Any]:
         ctx = context_of(session)

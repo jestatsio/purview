@@ -42,15 +42,17 @@ def discover_scoped(base: Any, policy: Policy, tenant_column: str) -> list[type]
             continue  # subclasses are covered by their base
         if policy.is_global(cls):
             continue
-        if hasattr(cls, tenant_column):
+        column = policy.tenant_field_for(cls, tenant_column)
+        if hasattr(cls, column):
             scoped.append(cls)
         else:
-            problems.append(cls.__name__)
+            problems.append(f"{cls.__name__} (expected {column!r})")
 
     if problems:
         raise UnscopedModel(
-            f"models lack the tenant column {tenant_column!r} and are not marked "
-            f"global: {sorted(problems)}. Add the column, register them with "
-            f"Policy.global_model(...), or choose a different tenant_column."
+            f"models lack their tenant column and are not marked global: "
+            f"{sorted(problems)}. Add the column, mark them with "
+            f"Policy.global_model(...), register a column with "
+            f"Policy.set_tenant_field(...), or choose a different tenant_column."
         )
     return scoped

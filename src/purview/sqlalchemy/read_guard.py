@@ -39,10 +39,11 @@ def make_read_guard(
         if ctx is None:
             return
         for entity in scoped:
+            column = policy.tenant_field_for(entity, tenant_column)
             state.statement = state.statement.options(
                 with_loader_criteria(
                     entity,
-                    tenant_predicate(entity, tenant_column, ctx.tenant_id),
+                    tenant_predicate(entity, column, ctx.tenant_id),
                     include_aliases=True,
                 )
             )

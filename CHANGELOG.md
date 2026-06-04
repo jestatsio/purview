@@ -8,6 +8,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Per-model tenant columns**: `Policy.set_tenant_field(Model, column)` scopes that
+  model by its own column (inherited by subclasses), alongside models that use the
+  `install(tenant_column=...)` default — wired through discovery, the read/write/
+  attach guards, the EXISTS checks, and create validation. Previously the column was
+  uniform across every model.
 - `before_attach` guard: an object carrying another tenant's id can no longer be
   added or merged into a session bound to a different tenant — closing a
   cross-session re-attach / merge hole and keeping one tenant per session.

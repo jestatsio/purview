@@ -30,7 +30,8 @@ def authorized_select(
     Applies tenant scope and the read predicate explicitly. On a bound session
     the guard would apply equivalent criteria too; the duplication is harmless.
     """
+    column = policy.tenant_field_for(model, tenant_column)
     return select(model).where(
-        tenant_predicate(model, tenant_column, ctx.tenant_id),
+        tenant_predicate(model, column, ctx.tenant_id),
         row_predicate(policy, ctx, model, READ, strict),
     )

@@ -31,8 +31,11 @@ def make_write_guard(
 ) -> Callable[[Session, Any, Any], None]:
     """Build a ``before_flush`` handler enforcing tenant ownership of writes."""
 
-    def _is_scoped(obj: object) -> bool:
-        return hasattr(obj, tenant_column) and not policy.is_global(type(obj))
+    def _column_for(obj: object) -> str | None:
+        if policy.is_global(type(obj)):
+            return None
+        column = policy.tenant_field_for(type(obj), tenant_column)
+        return column if hasattr(obj, column) else None
 
     def write_guard(session: Session, flush_context: Any, instances: Any) -> None:
         if is_bypassed():
@@ -42,11 +45,12 @@ def make_write_guard(
             return
 
         for obj in session.new:
-            if not _is_scoped(obj):
+            column = _column_for(obj)
+            if column is None:
                 continue
-            current = getattr(obj, tenant_column, None)
+            current = getattr(obj, column, None)
             if current is None:
-                setattr(obj, tenant_column, ctx.tenant_id)
+                setattr(obj, column, ctx.tenant_id)
             elif current != ctx.tenant_id:
                 raise CrossTenantWrite(
                     f"refusing to insert {type(obj).__name__} into tenant "
@@ -54,9 +58,10 @@ def make_write_guard(
                 )
 
         for obj in session.dirty:
-            if not _is_scoped(obj) or not session.is_modified(obj, include_collections=False):
+            column = _column_for(obj)
+            if column is None or not session.is_modified(obj, include_collections=False):
                 continue
-            current = getattr(obj, tenant_column, None)
+            current = getattr(obj, column, None)
             if current != ctx.tenant_id:
                 raise CrossTenantWrite(
                     f"refusing to move {type(obj).__name__} to tenant {current!r} "
@@ -81,11 +86,12 @@ def make_attach_guard(
         if is_bypassed():
             return
         ctx = context_of(session)
-        if ctx is None:
+        if ctx is None or policy.is_global(type(instance)):
             return
-        if not hasattr(instance, tenant_column) or policy.is_global(type(instance)):
+        column = policy.tenant_field_for(type(instance), tenant_column)
+        if not hasattr(instance, column):
             return
-        current = getattr(instance, tenant_column, None)
+        current = getattr(instance, column, None)
         if current is not None and current != ctx.tenant_id:
             raise CrossTenantWrite(
                 f"refusing to attach {type(instance).__name__} bound to tenant "

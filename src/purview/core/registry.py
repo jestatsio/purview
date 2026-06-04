@@ -82,5 +82,12 @@ class Policy:
         self._tenant_fields[model] = column
 
     def tenant_field_for(self, model: type, default: str) -> str:
-        """The tenant column for ``model``, falling back to the install default."""
-        return self._tenant_fields.get(model, default)
+        """The tenant column for ``model``, falling back to the install default.
+
+        Walks the MRO, so a subclass inherits an override registered on its base.
+        """
+        for klass in model.__mro__:
+            column = self._tenant_fields.get(klass)
+            if column is not None:
+                return column
+        return default
