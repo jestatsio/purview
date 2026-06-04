@@ -24,7 +24,7 @@ from purview.sqlalchemy.checking import batch_check, exists_check
 from purview.sqlalchemy.creating import validate_create as _validate_create
 from purview.sqlalchemy.discovery import discover_scoped
 from purview.sqlalchemy.read_guard import make_read_guard
-from purview.sqlalchemy.write_guard import make_write_guard
+from purview.sqlalchemy.write_guard import make_attach_guard, make_write_guard
 
 _SessionLike = AsyncSession | Session
 
@@ -58,25 +58,30 @@ class Purview:
         self._session_class = session_class
         self._read: Callable[[ORMExecuteState], None] | None = None
         self._write: Callable[[Session, Any, Any], None] | None = None
+        self._attach: Callable[[Session, object], None] | None = None
 
     def install(self) -> Purview:
-        """Wire the read/write guards onto the session class (idempotent)."""
+        """Wire the read/write/attach guards onto the session class (idempotent)."""
         if self._read is not None:
             return self
         self._read = make_read_guard(self.policy, self.scoped, self.tenant_column, self.strict)
         self._write = make_write_guard(self.policy, self.scoped, self.tenant_column)
+        self._attach = make_attach_guard(self.policy, self.tenant_column)
         event.listen(self._session_class, "do_orm_execute", self._read)
         event.listen(self._session_class, "before_flush", self._write)
+        event.listen(self._session_class, "before_attach", self._attach)
         return self
 
     def uninstall(self) -> None:
         """Remove the guards from the session class."""
-        if self._read is None or self._write is None:
+        if self._read is None or self._write is None or self._attach is None:
             return
         event.remove(self._session_class, "do_orm_execute", self._read)
         event.remove(self._session_class, "before_flush", self._write)
+        event.remove(self._session_class, "before_attach", self._attach)
         self._read = None
         self._write = None
+        self._attach = None
 
     def bind(self, session: _SessionLike, ctx: Context[Any, Any]) -> None:
         """Bind ``ctx`` to ``session`` so reads filter and writes are guarded."""

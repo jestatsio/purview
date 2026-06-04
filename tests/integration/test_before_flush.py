@@ -20,8 +20,12 @@ async def test_insert_auto_populates_tenant(env: Env) -> None:
 
 
 async def test_forged_tenant_insert_is_rejected(env: Env) -> None:
+    # Forge the tenant *after* attach (attach saw no tenant) so the flush-time
+    # write guard is what rejects it.
     async with env.bound(author_ctx(user_id=env.ids["alice"], tenant=1)) as s:
-        s.add(Post(id=201, org_id=2, author_id=env.ids["alice"], title="forged"))
+        post = Post(id=201, author_id=env.ids["alice"], title="forged")
+        s.add(post)
+        post.org_id = 2
         with pytest.raises(CrossTenantWrite):
             await s.commit()
 

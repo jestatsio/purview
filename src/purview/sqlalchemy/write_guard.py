@@ -1,12 +1,14 @@
 """The write guard.
 
-A ``before_flush`` handler that closes the write path:
+Two handlers close the write path and keep one tenant per session:
 
-* **inserts** with no tenant set are auto-populated with the session's tenant;
-* **inserts** that name a different tenant are rejected (forged insert);
-* **updates** that move a row across the tenant boundary are rejected.
+* ``before_attach`` refuses an object carrying another tenant's id from being
+  added or merged into a session bound to this tenant — so the identity map only
+  ever holds this tenant's rows (closes the cross-session re-attach / merge hole).
+* ``before_flush`` auto-populates the tenant on inserts with none set, rejects
+  forged-tenant inserts, and rejects updates that move a row across the boundary.
 
-This guards writes only; reads are guarded separately by the read guard.
+These guard writes only; reads are guarded separately by the read guard.
 """
 
 from __future__ import annotations
@@ -62,3 +64,32 @@ def make_write_guard(
                 )
 
     return write_guard
+
+
+def make_attach_guard(
+    policy: Policy,
+    tenant_column: str,
+) -> Callable[[Session, object], None]:
+    """Build a ``before_attach`` handler that refuses a foreign-tenant object.
+
+    A transient object with no tenant set is allowed (the write guard stamps it on
+    flush); an object already carrying a *different* tenant's id cannot enter the
+    session, whether via ``add`` or ``merge``.
+    """
+
+    def attach_guard(session: Session, instance: object) -> None:
+        if is_bypassed():
+            return
+        ctx = context_of(session)
+        if ctx is None:
+            return
+        if not hasattr(instance, tenant_column) or policy.is_global(type(instance)):
+            return
+        current = getattr(instance, tenant_column, None)
+        if current is not None and current != ctx.tenant_id:
+            raise CrossTenantWrite(
+                f"refusing to attach {type(instance).__name__} bound to tenant "
+                f"{current!r} to a session bound to tenant {ctx.tenant_id!r}"
+            )
+
+    return attach_guard

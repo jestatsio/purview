@@ -55,10 +55,10 @@ async def test_enforcement_resumes_after_bypass_exits(env: Env) -> None:
 
 
 async def test_no_leak_via_forged_create(env: Env) -> None:
+    # A forged tenant set at construction is refused the moment it is attached.
     async with env.bound(author_ctx(user_id=env.ids["alice"], tenant=1)) as s:
-        s.add(Post(id=500, org_id=2, author_id=env.ids["alice"], title="forged"))
         with pytest.raises(CrossTenantWrite):
-            await s.commit()
+            s.add(Post(id=500, org_id=2, author_id=env.ids["alice"], title="forged"))
 
 
 async def test_no_leak_via_cross_tenant_update(env: Env) -> None:

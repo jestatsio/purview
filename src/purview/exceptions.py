@@ -27,10 +27,11 @@ class CrossTenantWrite(PurviewError):
 
 
 class TenantMismatch(PurviewError):
-    """A query's ambient tenant disagrees with the session's bound tenant.
+    """A session bound to one tenant is being rebound to a different one.
 
-    Signals a programming error (a session used for the wrong tenant), caught
-    defensively before any rows are returned.
+    Raised by ``bind_context`` / ``Purview.bind`` when a request would reuse a
+    session that already carries another tenant's context — the cross-tenant
+    footgun the session boundary exists to prevent.
     """
 
 

@@ -31,6 +31,7 @@ role yields an empty set, which compiles to `false()` — **default deny**.
 Tenant isolation does not live in a per-query filter you hope always runs:
 
 - One session per request, bound to exactly one tenant (in `session.info`).
+  Rebinding it to a *different* tenant raises `TenantMismatch`.
 - A `do_orm_execute` hook applies the tenant filter via `with_loader_criteria`,
   scoping every read to the session's bound tenant.
 - A `before_flush` hook auto-populates the tenant column on inserts and rejects

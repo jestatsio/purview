@@ -6,6 +6,21 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `before_attach` guard: an object carrying another tenant's id can no longer be
+  added or merged into a session bound to a different tenant — closing a
+  cross-session re-attach / merge hole and keeping one tenant per session.
+- Expanded adversarial suite (SQLite + Postgres): `merge`, `refresh` /
+  `populate_existing`, detached re-attach, concurrent async-task bypass isolation,
+  single-table inheritance, and the documented raw-SQL / lazy-load boundary.
+
+### Changed
+
+- `TenantMismatch` is now raised when a session bound to one tenant is rebound to a
+  *different* one (previously exported but never raised). Rebinding within the same
+  tenant is still allowed.
+
 ## [0.1.1] - 2026-06-04
 
 ### Added
