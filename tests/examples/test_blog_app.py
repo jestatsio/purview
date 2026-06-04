@@ -17,7 +17,13 @@ import pytest
 from fastapi import Depends, FastAPI, Header, HTTPException
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import ForeignKey, Integer, String, select, true
-from sqlalchemy.ext.asyncio import AsyncAttrs, AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncAttrs,
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.pool import StaticPool
 
@@ -105,7 +111,7 @@ async def _seed(sm: async_sessionmaker[AsyncSession]) -> None:
         await s.commit()
 
 
-async def create_app() -> tuple[FastAPI, Purview]:
+async def create_app() -> tuple[FastAPI, Purview, AsyncEngine]:
     engine = create_async_engine(
         "sqlite+aiosqlite:///:memory:",
         poolclass=StaticPool,
@@ -188,16 +194,17 @@ async def create_app() -> tuple[FastAPI, Purview]:
         # The route guard 403s an actor with no standing grant before we query.
         return [{"id": p.id} for p in (await session.scalars(select(Post))).all()]
 
-    return app, pv
+    return app, pv, engine
 
 
 @pytest.fixture
 async def client() -> AsyncIterator[AsyncClient]:
-    app, pv = await create_app()
+    app, pv, engine = await create_app()
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
     pv.uninstall()
+    await engine.dispose()
 
 
 def _as(user_id: int, org_id: int) -> dict[str, str]:
