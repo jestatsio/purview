@@ -8,6 +8,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Composite primary keys** in `batch_check` / `authorized_ids` (matching on the
+  tuple of key columns; single-column keys are unchanged). Verified UUID / non-int
+  tenant and user ids across SQLite and Postgres.
 - **Per-model tenant columns**: `Policy.set_tenant_field(Model, column)` scopes that
   model by its own column (inherited by subclasses), alongside models that use the
   `install(tenant_column=...)` default — wired through discovery, the read/write/
