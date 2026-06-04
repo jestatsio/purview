@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: purview_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      UV_PYTHON: ${{ matrix.python-version }}
+      PURVIEW_TEST_POSTGRES_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/purview_test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Lint
+        run: uv run --extra dev ruff check .
+
+      - name: Type-check (strict)
+        run: uv run --extra dev mypy
+
+      - name: Test (SQLite + Postgres) with coverage gate
+        run: uv run --extra dev pytest --cov=purview --cov-report=term-missing --cov-fail-under=90
