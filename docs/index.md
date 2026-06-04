@@ -66,3 +66,5 @@ async with async_session() as session:
   to its test.
 - [Migrating from Oso](MIGRATING_FROM_OSO.md).
 - [API reference](reference.md).
+- [Example app](https://github.com/jestatsio/purview/tree/main/examples/tracker) — a
+  multi-tenant tracker (FastAPI + Alembic + Postgres) exercising every feature.

@@ -74,6 +74,7 @@ select = ["E", "F", "I", "B", "UP", "S", "C4", "SIM", "RUF"]
 "tests/**" = ["S101", "RUF012"]  # assert is the point of a test; __mapper_args__ is a SA idiom
 "src/purview/fastapi/**" = ["B008"]  # Depends(...) in defaults is the FastAPI idiom
 "tests/examples/**" = ["S101", "RUF012", "B008"]
+"examples/**" = ["S101", "RUF012", "B008", "E501"]  # runnable example apps
 "spike/**" = ["S101", "B018"]
 
 [tool.mypy]

@@ -177,6 +177,8 @@ complete, runnable app.
 - [Threat model](docs/THREAT_MODEL.md) — what is and isn't enforced, each guarantee
   mapped to the test that proves it.
 - [Migrating from Oso](docs/MIGRATING_FROM_OSO.md).
+- [Example app](examples/tracker/) — a multi-tenant tracker (FastAPI + Alembic +
+  Postgres) exercising per-model columns, composite/UUID keys, and read/create rules.
 - [Security policy](SECURITY.md) · [Contributing](CONTRIBUTING.md) · [Releasing](RELEASING.md).
 
 ## How it compares

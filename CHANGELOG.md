@@ -6,6 +6,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- A published documentation site (MkDocs Material) at
+  <https://jestatsio.github.io/purview/> with an API reference, the threat model, and
+  the Oso migration guide.
+- A runnable multi-tenant example app (`examples/tracker`) — FastAPI + Alembic +
+  Postgres — exercising per-model tenant columns, composite and UUID primary keys, a
+  read rule, and a create rule, validated by an HTTP smoke test.
+
 ## [0.2.0] - 2026-06-04
 
 ### Added
