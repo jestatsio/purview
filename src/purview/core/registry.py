@@ -15,7 +15,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from purview.core.types import RuleFn
+    from purview.core.types import CreateRuleFn, RuleFn
 
 
 class Policy:
@@ -27,6 +27,7 @@ class Policy:
 
     def __init__(self) -> None:
         self._rules: dict[tuple[type, str], list[RuleFn]] = {}
+        self._create_rules: dict[type, list[CreateRuleFn]] = {}
         self._global_models: set[type] = set()
         self._tenant_fields: dict[type, str] = {}
 
@@ -57,6 +58,31 @@ class Policy:
     def has_rules(self, model: type, action: str) -> bool:
         """Whether any rule is registered for ``(model, action)``."""
         return bool(self._rules.get((model, action)))
+
+    def create_rule(self, model: type) -> Callable[[CreateRuleFn], CreateRuleFn]:
+        """Register a create rule for ``model``.
+
+        ``create`` has no row to filter, so its rule is a plain predicate over the
+        proposed instance — type-checked and unit-testable like any function::
+
+            @policy.create_rule(Post)
+            def create_post(ctx: Context, post: Post) -> bool:
+                return post.author_id == ctx.user_id
+
+        Multiple create rules for one model are AND-combined (all must pass). The
+        tenant is validated structurally regardless, and the write guard remains the
+        backstop at flush.
+        """
+
+        def decorator(fn: CreateRuleFn) -> CreateRuleFn:
+            self._create_rules.setdefault(model, []).append(fn)
+            return fn
+
+        return decorator
+
+    def create_rules_for(self, model: type) -> list[CreateRuleFn]:
+        """All registered create rules for ``model`` (possibly empty)."""
+        return list(self._create_rules.get(model, ()))
 
     # -- tenant scoping configuration -------------------------------------- #
     def global_model(self, model: type) -> type:

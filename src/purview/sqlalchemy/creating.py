@@ -9,20 +9,27 @@ call to fail fast with a 403 rather than at commit.
 
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any
 
 from purview.core.context import Context
+
+if TYPE_CHECKING:
+    from purview.core.types import CreateRuleFn
 
 
 def validate_create(
     ctx: Context[Any, Any],
     resource: object,
     tenant_column: str,
+    create_rules: Iterable[CreateRuleFn] = (),
 ) -> bool:
     """Whether ``resource`` may be created in ``ctx``'s tenant.
 
-    True when the proposed tenant is unset (the write guard will stamp it) or
-    already matches the session's tenant.
+    The proposed tenant must be unset (the write guard will stamp it) or match the
+    session's tenant, and every registered create rule must pass.
     """
     proposed = getattr(resource, tenant_column, None)
-    return proposed is None or proposed == ctx.tenant_id
+    if proposed is not None and proposed != ctx.tenant_id:
+        return False
+    return all(rule(ctx, resource) for rule in create_rules)

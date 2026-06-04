@@ -8,6 +8,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Fine-grained `create` rules**: `@policy.create_rule(Model)` runs a plain
+  `(ctx, proposed_obj) -> bool` predicate at `validate_create` time — create has no
+  row to filter, so it is a type-checked Python predicate over the proposed object.
+  Multiple rules AND-combine; the tenant check and the flush-time write guard still
+  apply.
 - **Composite primary keys** in `batch_check` / `authorized_ids` (matching on the
   tuple of key columns; single-column keys are unchanged). Verified UUID / non-int
   tenant and user ids across SQLite and Postgres.

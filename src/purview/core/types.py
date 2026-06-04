@@ -13,3 +13,7 @@ if TYPE_CHECKING:
 # A rule maps an actor Context to zero or more boolean predicates. The predicates
 # are OR-combined; returning an empty list denies (see ``evaluate_predicate``).
 RuleFn = Callable[["Context[Any, Any]"], list[ColumnElement[bool]]]
+
+# A create rule maps (Context, the proposed instance) to a boolean — create has no
+# row to filter, so it is a plain predicate over the not-yet-persisted object.
+CreateRuleFn = Callable[["Context[Any, Any]", Any], bool]

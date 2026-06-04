@@ -123,9 +123,14 @@ class Purview:
         )
 
     def validate_create(self, session: _SessionLike, resource: object) -> bool:
-        """Whether ``resource`` may be created in the bound actor's tenant."""
+        """Whether ``resource`` may be created in the bound actor's tenant.
+
+        Checks the proposed tenant and every registered ``create_rule`` for the
+        model. The write guard remains the structural backstop at flush.
+        """
         column = self.policy.tenant_field_for(type(resource), self.tenant_column)
-        return _validate_create(self._ctx(session), resource, column)
+        rules = self.policy.create_rules_for(type(resource))
+        return _validate_create(self._ctx(session), resource, column, rules)
 
     def _ctx(self, session: _SessionLike) -> Context[Any, Any]:
         ctx = context_of(session)
