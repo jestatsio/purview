@@ -44,9 +44,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/erichare/purview"
-Repository = "https://github.com/erichare/purview"
-Issues = "https://github.com/erichare/purview/issues"
+Homepage = "https://github.com/jestatsio/purview"
+Repository = "https://github.com/jestatsio/purview"
+Issues = "https://github.com/jestatsio/purview/issues"
+Changelog = "https://github.com/jestatsio/purview/blob/main/CHANGELOG.md"
 
 [tool.hatch.version]
 source = "vcs"

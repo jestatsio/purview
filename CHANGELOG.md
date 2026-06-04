@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-06-04
+
 ### Added
 
 - **Core** (`purview.core`): `Context`, the `Policy` rule registry, and the
@@ -25,4 +27,5 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (parametrized over SQLite and Postgres), an adversarial leak suite, and a
   runnable FastAPI example app.
 
-[Unreleased]: https://github.com/erichare/purview/commits/main
+[Unreleased]: https://github.com/jestatsio/purview/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/jestatsio/purview/releases/tag/v0.1.0

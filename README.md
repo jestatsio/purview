@@ -1,5 +1,10 @@
 # Purview
 
+[![CI](https://github.com/jestatsio/purview/actions/workflows/ci.yml/badge.svg)](https://github.com/jestatsio/purview/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/purview-authz)](https://pypi.org/project/purview-authz/)
+[![Python](https://img.shields.io/pypi/pyversions/purview-authz)](https://pypi.org/project/purview-authz/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 **Row-level authorization and multi-tenancy for FastAPI + SQLAlchemy.** Define a
 policy once as SQLAlchemy column expressions and get both yes/no checks and query
 filtering from the same rule — so the check and the filter can never disagree.
