@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-14
+
 ### Added
 
 - **`Purview.explain(session_or_ctx, action, model)`**: introspect the exact tenant +
@@ -100,7 +102,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (parametrized over SQLite and Postgres), an adversarial leak suite, and a
   runnable FastAPI example app.
 
-[Unreleased]: https://github.com/jestatsio/purview/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/jestatsio/purview/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/jestatsio/purview/releases/tag/v0.3.0
 [0.2.0]: https://github.com/jestatsio/purview/releases/tag/v0.2.0
 [0.1.1]: https://github.com/jestatsio/purview/releases/tag/v0.1.1
 [0.1.0]: https://github.com/jestatsio/purview/releases/tag/v0.1.0
