@@ -1,0 +1,54 @@
+name: GitHub Release
+
+# Creates a GitHub Release from the matching CHANGELOG section whenever a version
+# tag is pushed. Can also be dispatched manually for an existing tag (e.g. to
+# back-fill a release) from the Actions tab. PyPI publishing stays in release.yml;
+# this workflow only creates the GitHub Release.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to (re)create the GitHub Release for, e.g. v0.3.0"
+        required: true
+        type: string
+
+permissions:
+  contents: write # required to create releases
+
+jobs:
+  github-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve tag
+        id: tag
+        run: echo "tag=${{ inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+
+      - name: Extract the CHANGELOG section for this version
+        run: |
+          version="${{ steps.tag.outputs.tag }}"
+          version="${version#v}"
+          awk -v ver="$version" '
+            index($0, "## [" ver "]") == 1 { flag = 1; next }
+            flag && index($0, "## [") == 1 { exit }
+            flag { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "::error::No CHANGELOG section found for version $version" >&2
+            exit 1
+          fi
+          echo "Release notes for $version:"
+          cat release-notes.md
+
+      - name: Create or update the GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: ${{ steps.tag.outputs.tag }}
+          body_path: release-notes.md
