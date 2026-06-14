@@ -26,6 +26,15 @@ The actor's tenant-scoped roles decide which predicates apply for a given
 `(action, resource type)`. Granting predicates are **OR-combined**. No granting
 role yields an empty set, which compiles to `false()` — **default deny**.
 
+**Role hierarchies.** `Policy.role_implies("admin", "editor")` declares that a
+higher role also grants lower ones (transitively, cycle-safe). The closure is
+expanded **once at `bind`**, where the policy is in scope, and stored on the
+session's context — so rules keep calling `ctx.has_role("editor")` unchanged and an
+`admin` satisfies it. Expansion deliberately does not live on `Context` (which stays
+frozen and policy-agnostic) nor in an author-called helper (which could be forgotten,
+a silent authz gap); doing it at the single `bind` entry point makes it transparent
+and secure-by-default.
+
 ## Tenancy is the session boundary
 
 Tenant isolation does not live in a per-query filter you hope always runs:
@@ -54,6 +63,18 @@ ship unscoped is rejected at startup rather than leaking at query time.
 - `fastapi` — dependencies that resolve `Context` and call `authorize`, plus 403
   handling.
 
+## Introspection, without a database
+
+`Purview.explain(session_or_ctx, action, model)` compiles the exact tenant + row
+predicate the guard would apply — reusing the same `predicates.row_predicate` /
+`tenant_predicate` the read guard and the EXISTS check use, so the explanation can
+never drift from enforcement. It builds and compiles expressions but never executes
+them, so it needs no session round-trip and no async. `Purview.audit()` classifies
+every model's read visibility from the policy alone, flagging scoped models with no
+read rule (visible tenant-wide under the default policy); `install(audit="warn"|
+"raise")` surfaces those at startup, the same fail-closed posture as the unscoped-model
+check. Both are pure developer aids — they observe the policy, they do not change it.
+
 ## Escape hatch
 
 One loud, greppable bypass for admin tooling and migrations:
@@ -64,6 +85,9 @@ with policy.bypass(reason="nightly billing rollup"):
 ```
 
 Raw SQL and Core `text()` are outside the enforcement boundary by documentation.
+`install(warn_on_unfiltered=True)` turns that documentation into a runtime
+`PurviewWarning` (raw `text()` on a bound session, or any query on an unbound one) —
+an advisory aid for development, not an enforcement control.
 
 ---
 

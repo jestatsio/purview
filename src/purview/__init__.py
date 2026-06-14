@@ -13,12 +13,17 @@ from __future__ import annotations
 from importlib.metadata import PackageNotFoundError, version
 
 from purview.core.actions import CREATE, DELETE, READ, UPDATE, Action
+from purview.core.audit import AuditReport, ModelAudit
 from purview.core.context import Context
+from purview.core.explanation import PredicateExplanation, RuleContribution
+from purview.core.helpers import in_values, owned_by
 from purview.core.registry import Policy
 from purview.exceptions import (
     CrossTenantWrite,
+    PolicyAuditError,
     PurviewError,
     PurviewForbidden,
+    PurviewWarning,
     TenantMismatch,
     UnscopedModel,
 )
@@ -34,12 +39,20 @@ __all__ = [
     "READ",
     "UPDATE",
     "Action",
+    "AuditReport",
     "Context",
     "CrossTenantWrite",
+    "ModelAudit",
     "Policy",
+    "PolicyAuditError",
+    "PredicateExplanation",
     "PurviewError",
     "PurviewForbidden",
+    "PurviewWarning",
+    "RuleContribution",
     "TenantMismatch",
     "UnscopedModel",
     "__version__",
+    "in_values",
+    "owned_by",
 ]

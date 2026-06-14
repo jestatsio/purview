@@ -57,7 +57,14 @@ async with async_session() as session:
 - **Tenancy is the session boundary.** One session, one tenant; reads, writes, and
   attaches are all guarded. See the [threat model](THREAT_MODEL.md).
 - **Secure by default.** Every model is tenant-scoped; `install()` refuses to start
-  if a model lacks its tenant column.
+  if a model lacks its tenant column. `Purview.audit()` flags any model left visible
+  tenant-wide, and `install(warn_on_unfiltered=True)` warns on the documented
+  unfiltered sharp edges.
+- **Inspectable.** `Purview.explain(session, "read", Post)` shows the exact predicate
+  the guard applies — compiled SQL, contributing rules, effective roles — with no
+  database round-trip.
+- **Composable rules.** Role hierarchies (`Policy.role_implies`) and predicate helpers
+  (`owned_by`, `in_values`) keep policies declarative.
 
 ## Learn more
 

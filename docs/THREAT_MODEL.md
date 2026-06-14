@@ -45,7 +45,10 @@ These are **outside the boundary by design** — know them:
 - **Raw SQL and Core `text()`** — Purview shapes ORM statements, not hand-written
   SQL. `session.execute(text("SELECT ..."))` sees every tenant
   (`test_adversarial_orm::test_raw_text_sql_is_not_filtered`). Don't hand-write
-  tenant-sensitive SQL.
+  tenant-sensitive SQL. `install(warn_on_unfiltered=True)` raises a `PurviewWarning`
+  when a raw/non-ORM statement runs on a bound session, or when any query runs on an
+  unbound one — an **advisory** development aid, not a control; the boundary above is
+  unchanged whether or not warnings are on.
 - **Unbound sessions** — a session with no bound context is not filtered. This is how
   you seed and run migrations; never serve a request on one.
 - **`bypass(reason=...)` blocks** — enforcement is intentionally suspended. Keep them
@@ -60,6 +63,11 @@ By default a scoped model with no read rule is visible tenant-wide (tenant isola
 still applies). `install(..., strict=True)` flips this to within-tenant default deny.
 The **cross-tenant boundary is enforced identically in both modes** — `strict` only
 governs models that have no rule of their own.
+
+`Purview.audit()` (and `install(audit="warn"|"raise")`) reports the scoped models that
+fall into this tenant-wide bucket, so an accidentally-unruled model is caught at
+startup rather than in production. Under `strict=True` those models default-deny, so
+the audit finds nothing.
 
 ## Reporting
 
