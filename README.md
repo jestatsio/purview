@@ -122,6 +122,45 @@ flip this to within-tenant **default deny** — every model then needs an explic
 rule to grant any access. The cross-tenant boundary is enforced identically in
 both modes.
 
+## Authoring and debugging policies
+
+**Predicate helpers** for the common patterns:
+
+```python
+from purview.predicates import owned_by, in_values
+
+@policy.rule(Post, READ)
+def read_post(ctx):
+    rules = [owned_by(Post.author_id, ctx)]            # Post.author_id == ctx.user_id
+    if ctx.has_role("editor"):
+        rules.append(in_values(Post.section_id, ctx.sections))  # empty -> deny
+    return rules
+```
+
+**Role hierarchies** — a higher role grants the lower ones, expanded once at `bind`:
+
+```python
+policy.role_implies("admin", "editor")     # admin satisfies has_role("editor")
+```
+
+**Explain** the exact predicate the guard would apply — no database round-trip:
+
+```python
+print(pv.explain(session, "read", Post))   # or pass a bare Context
+# tenant scope  : post.org_id = 1
+# row predicate : post.author_id = 42
+```
+
+**Audit** for models left visible tenant-wide, and **warn** on the unfiltered sharp
+edges — both opt-in:
+
+```python
+pv = install(Base, policy, tenant_column="org_id",
+             audit="warn",            # report scoped models with no read rule
+             warn_on_unfiltered=True) # PurviewWarning on raw text()/unbound queries
+pv.audit().tenant_wide_models        # inspect the same report at any time
+```
+
 ## The enforcement boundary
 
 Inside the boundary: ORM `select`s, `session.get`, relationship loads, and flushes

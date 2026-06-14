@@ -11,7 +11,7 @@ of sessions, engines, or the web layer.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -30,6 +30,7 @@ class Policy:
         self._create_rules: dict[type, list[CreateRuleFn]] = {}
         self._global_models: set[type] = set()
         self._tenant_fields: dict[type, str] = {}
+        self._role_implications: dict[str, set[str]] = {}
 
     # -- rule registration ------------------------------------------------- #
     def rule(self, model: type, action: str) -> Callable[[RuleFn], RuleFn]:
@@ -117,3 +118,33 @@ class Policy:
             if column is not None:
                 return column
         return default
+
+    # -- role hierarchy ---------------------------------------------------- #
+    def role_implies(self, role: str, *implied: str) -> None:
+        """Declare that holding ``role`` also grants ``implied`` roles.
+
+        Implications are transitive: ``role_implies("admin", "editor")`` and
+        ``role_implies("editor", "viewer")`` together mean an ``admin`` holds
+        ``editor`` and ``viewer`` too. The closure is applied once when a context
+        is bound, so rules keep calling ``ctx.has_role("viewer")`` unchanged and a
+        higher role satisfies it automatically.
+        """
+        self._role_implications.setdefault(role, set()).update(implied)
+
+    def expand_roles(self, roles: Iterable[str]) -> frozenset[str]:
+        """The transitive closure of ``roles`` under the declared implications.
+
+        Cycle- and self-loop-safe. With no implications declared (or none reachable
+        from ``roles``), returns the input as a ``frozenset`` unchanged.
+        """
+        if not self._role_implications:
+            return frozenset(roles)
+        seen: set[str] = set()
+        stack = list(roles)
+        while stack:
+            role = stack.pop()
+            if role in seen:
+                continue
+            seen.add(role)
+            stack.extend(self._role_implications.get(role, ()))
+        return frozenset(seen)

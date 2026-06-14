@@ -13,9 +13,7 @@ async def test_eager_selectinload_is_tenant_filtered(env: Env) -> None:
     async with env.bound(admin_ctx(tenant=1)) as s:
         post = (
             await s.scalars(
-                select(Post)
-                .where(Post.id == env.ids["post1"])
-                .options(selectinload(Post.comments))
+                select(Post).where(Post.id == env.ids["post1"]).options(selectinload(Post.comments))
             )
         ).one()
         ids = {c.id for c in post.comments}

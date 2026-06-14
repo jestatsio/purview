@@ -48,9 +48,27 @@ async def seed_demo(sessionmaker: async_sessionmaker) -> None:
                 Membership(workspace_id=WS1, user_id=BOB, role="member"),
                 Membership(workspace_id=WS1, user_id=DAVE, role="admin"),
                 Membership(workspace_id=WS2, user_id=CAROL, role="admin"),
-                Task(id=TASK_ALICE, workspace_id=WS1, project_id=p1.id, assignee_id=ALICE, title="alice-task"),
-                Task(id=TASK_BOB, workspace_id=WS1, project_id=p1.id, assignee_id=BOB, title="bob-task"),
-                Task(id=TASK_CAROL, workspace_id=WS2, project_id=p2.id, assignee_id=CAROL, title="carol-task"),
+                Task(
+                    id=TASK_ALICE,
+                    workspace_id=WS1,
+                    project_id=p1.id,
+                    assignee_id=ALICE,
+                    title="alice-task",
+                ),
+                Task(
+                    id=TASK_BOB,
+                    workspace_id=WS1,
+                    project_id=p1.id,
+                    assignee_id=BOB,
+                    title="bob-task",
+                ),
+                Task(
+                    id=TASK_CAROL,
+                    workspace_id=WS2,
+                    project_id=p2.id,
+                    assignee_id=CAROL,
+                    title="carol-task",
+                ),
             ]
         )
         await session.commit()

@@ -18,6 +18,22 @@ The public surface, generated from the source docstrings.
 
 ::: purview.sqlalchemy.bypass
 
+## Predicate helpers (`purview.predicates`)
+
+::: purview.predicates.owned_by
+
+::: purview.predicates.in_values
+
+## Introspection
+
+::: purview.PredicateExplanation
+
+::: purview.RuleContribution
+
+::: purview.AuditReport
+
+::: purview.ModelAudit
+
 ## FastAPI (`purview.fastapi`)
 
 ::: purview.fastapi.context_binder
@@ -39,3 +55,7 @@ The public surface, generated from the source docstrings.
 ::: purview.TenantMismatch
 
 ::: purview.UnscopedModel
+
+::: purview.PolicyAuditError
+
+::: purview.PurviewWarning

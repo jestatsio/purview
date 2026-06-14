@@ -6,8 +6,29 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-14
+
 ### Added
 
+- **`Purview.explain(session_or_ctx, action, model)`**: introspect the exact tenant +
+  row predicate the guard would apply — compiled SQL, per-rule contributions, the
+  actor's effective roles, the governing action, and default-deny detection — without
+  touching the database. Accepts a bound session or a bare `Context`. New public types
+  `PredicateExplanation` and `RuleContribution`.
+- **Dev-mode footgun warnings**: opt-in `install(..., warn_on_unfiltered=True)` emits a
+  `PurviewWarning` when a query runs on an unbound session or when a raw/non-ORM
+  `text()` statement runs on a bound one — surfacing the documented sharp edges at
+  runtime. Off by default (no behavior change); advisory only, not a control.
+- **Policy audit**: `Purview.audit()` returns a structured `AuditReport` classifying
+  every model's read visibility, flagging scoped models with no read rule (visible
+  tenant-wide under the default policy). `install(..., audit="warn"|"raise")` surfaces
+  those at startup; `"raise"` raises the new `PolicyAuditError`.
+- **Role hierarchies**: `Policy.role_implies("admin", "editor")` so a higher role
+  transparently satisfies `has_role`/`has_any` for implied roles. Transitive and
+  cycle-safe; the closure is applied once at `bind`, so rules are written unchanged.
+- **Predicate helpers**: `purview.predicates.owned_by(column, ctx)` and
+  `in_values(column, values)` (also exported from `purview`) — reusable builders for
+  the most common rule patterns. `in_values([])` compiles to `false()` (default deny).
 - A published documentation site (MkDocs Material) at
   <https://jestatsio.github.io/purview/> with an API reference, the threat model, and
   the Oso migration guide.
@@ -81,7 +102,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (parametrized over SQLite and Postgres), an adversarial leak suite, and a
   runnable FastAPI example app.
 
-[Unreleased]: https://github.com/jestatsio/purview/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/jestatsio/purview/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/jestatsio/purview/releases/tag/v0.3.0
 [0.2.0]: https://github.com/jestatsio/purview/releases/tag/v0.2.0
 [0.1.1]: https://github.com/jestatsio/purview/releases/tag/v0.1.1
 [0.1.0]: https://github.com/jestatsio/purview/releases/tag/v0.1.0

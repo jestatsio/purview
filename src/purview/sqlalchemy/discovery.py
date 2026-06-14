@@ -22,8 +22,7 @@ def _mappers(base: Any) -> Any:
     if hasattr(base, "mappers"):
         return base.mappers
     raise TypeError(
-        "install() expects a DeclarativeBase subclass or a registry; "
-        f"got {type(base).__name__}"
+        f"install() expects a DeclarativeBase subclass or a registry; got {type(base).__name__}"
     )
 
 

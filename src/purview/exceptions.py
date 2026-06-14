@@ -41,3 +41,22 @@ class UnscopedModel(PurviewError):
     Raised at ``install()`` time (fail closed) so a model that would otherwise
     ship unscoped is rejected at startup rather than leaking at query time.
     """
+
+
+class PolicyAuditError(PurviewError):
+    """The policy audit found scoped models that are visible tenant-wide.
+
+    Raised at ``install(audit="raise")`` time so a model with no read rule —
+    readable by every actor in its tenant — is surfaced at startup rather than
+    discovered in production.
+    """
+
+
+class PurviewWarning(UserWarning):
+    """An opt-in developer warning about a likely enforcement gap.
+
+    Never emitted by default. ``install(warn_on_unfiltered=True)`` turns on the
+    runtime warnings (raw ``text()`` on a bound session, queries on an unbound
+    session) and ``install(audit="warn")`` reports tenant-wide models. These are
+    advisory aids, not controls — the enforcement boundary is unchanged.
+    """

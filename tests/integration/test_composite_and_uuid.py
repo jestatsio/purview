@@ -77,9 +77,7 @@ async def test_composite_primary_key_batch_and_object_check(url: str) -> None:
         async with sm() as s:
             pv.bind(s, Context(1, 1, frozenset()))
             # batch check over composite ids returns the in-tenant subset, as tuples
-            allowed = await pv.authorized_ids(
-                s, "read", Membership, [(1, 1), (1, 2), (2, 1)]
-            )
+            allowed = await pv.authorized_ids(s, "read", Membership, [(1, 1), (1, 2), (2, 1)])
             assert set(allowed) == {(1, 1), (1, 2)}
             # collection + get are tenant-filtered
             assert {(m.org_id, m.user_id) for m in await s.scalars(select(Membership))} == {
