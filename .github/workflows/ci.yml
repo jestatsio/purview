@@ -35,7 +35,7 @@ jobs:
       - name: Build documentation
         run: uv run --locked --all-extras mkdocs build --strict
       - name: Run the documented quickstart
-        run: uv run --locked --all-extras python examples/quickstart.py
+        run: uv run --locked --all-extras python scripts/check_docs.py
       - name: Validate release notes
         if: github.ref_type == 'tag'
         env:
