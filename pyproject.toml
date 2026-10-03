@@ -27,7 +27,7 @@ classifiers = [
   "Topic :: Security",
   "Typing :: Typed",
 ]
-dependencies = ["sqlalchemy[asyncio]>=2.0,<2.1"]
+dependencies = ["sqlalchemy[asyncio]>=2.1.1,<2.2"]
 
 [project.optional-dependencies]
 fastapi = ["fastapi>=0.110"]
@@ -48,7 +48,7 @@ dev = [
 ]
 docs = [
   "mkdocs-material>=9.5",
-  "mkdocstrings[python]>=0.26",
+  "mkdocstrings[python]>=1.0.6",
   "fastapi>=0.110",
 ]
 
