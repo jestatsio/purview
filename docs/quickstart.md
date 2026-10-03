@@ -20,9 +20,11 @@ Save this as `quickstart.py`, or copy it from
 [the repository](https://github.com/jestatsio/purview/blob/main/examples/quickstart.py).
 This page includes that file directly, so the example and documentation stay in sync.
 
+<!-- fmt:off -->
 ```python title="quickstart.py"
---8 < --"examples/quickstart.py"
+--8<-- "examples/quickstart.py"
 ```
+<!-- fmt:on -->
 
 ## 3. Run it
 
