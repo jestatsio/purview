@@ -12,6 +12,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,8 +26,17 @@ from .policy import build_policy
 
 pv = install(Base, build_policy(), tenant_column="workspace_id")
 
-app = FastAPI(title="Purview Tracker (dogfood)")
+app = FastAPI(title="Purview Tracker")
 install_error_handlers(app)
+
+
+class ProjectCreate(BaseModel):
+    owner_id: uuid.UUID
+    name: str = Field(min_length=1, max_length=100)
+
+
+class TaskUpdate(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
 
 
 async def get_session() -> AsyncIterator[AsyncSession]:
@@ -62,13 +72,13 @@ async def list_projects(session: AsyncSession = Depends(bound)) -> list[dict[str
 
 @app.post("/projects", status_code=201)
 async def create_project(
-    payload: dict[str, Any], session: AsyncSession = Depends(bound)
+    payload: ProjectCreate, session: AsyncSession = Depends(bound)
 ) -> dict[str, Any]:
     ctx = pv.context(session)
     project = Project(
         workspace_id=ctx.tenant_id,
-        owner_id=uuid.UUID(payload["owner_id"]),
-        name=payload["name"],
+        owner_id=payload.owner_id,
+        name=payload.name,
     )
     if not pv.validate_create(session, project):  # create rule: owner must be the creator
         raise PurviewForbidden("you may only create projects you own")
@@ -93,13 +103,13 @@ async def get_task(task_id: uuid.UUID, session: AsyncSession = Depends(bound)) -
 
 @app.patch("/tasks/{task_id}")
 async def update_task(
-    task_id: uuid.UUID, payload: dict[str, Any], session: AsyncSession = Depends(bound)
+    task_id: uuid.UUID, payload: TaskUpdate, session: AsyncSession = Depends(bound)
 ) -> dict[str, Any]:
     task = await session.get(Task, task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="not found")
     await authorize_or_403(pv, session, "update", task)
-    task.title = payload["title"]
+    task.title = payload.title
     await session.commit()
     return {"id": str(task.id), "title": task.title}
 

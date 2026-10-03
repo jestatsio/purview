@@ -5,11 +5,8 @@ Security reports are taken seriously and handled promptly.
 
 ## Supported versions
 
-| Version | Supported |
-|---------|-----------|
-| 0.1.x   | ✅        |
-
-Until 1.0, only the latest released 0.x line receives security fixes.
+Until 1.0, only the [latest released version](https://github.com/jestatsio/purview/releases/latest)
+receives security fixes. Upgrade to the latest release when reporting a problem.
 
 ## Reporting a vulnerability
 
@@ -35,5 +32,6 @@ bypass a registered policy, through the supported ORM surface (`select`,
 `Session.get`, relationship loads, and flush) on a context-bound session.
 
 **Out of scope** — behaviour documented as outside the enforcement boundary:
-raw SQL and Core `text()`, unbound sessions, and explicit `bypass(...)` blocks.
-See [the enforcement boundary](README.md#the-enforcement-boundary).
+raw SQL, Core statements, bulk DML, unbound sessions, and explicit `bypass(...)`
+blocks. Use a fresh session per actor and bind it before loading data.
+See [the enforcement boundary](https://jestatsio.github.io/purview/THREAT_MODEL/).

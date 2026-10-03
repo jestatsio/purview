@@ -1,75 +1,122 @@
-# Threat Model
+# Security boundary
 
-Purview's job is one property: **an actor only ever reads or writes rows in its own
-tenant, and only rows its policy permits.** This document states the trust boundary,
-what is and isn't enforced, and maps each guarantee to the test that proves it.
+Purview filters supported ORM reads and guards tenant IDs during normal ORM object
+writes. Fine-grained create, update, and delete permissions require **explicit
+application checks**. This page describes the assumptions and exclusions behind
+those controls.
 
-## Trust boundary: the session
+## The session is the boundary
 
-A request binds exactly one [`Context`](https://github.com/jestatsio/purview/blob/main/src/purview/core/context.py) (user +
-tenant + roles) to its SQLAlchemy session. **The session is the boundary.** Every
-guarantee below assumes:
+All automatic enforcement assumes:
 
-1. One session per request, bound to one tenant via `pv.bind(session, ctx)`.
-2. The application does not hand a session bound to one tenant to another tenant's
-   request. (Rebinding to a *different* tenant raises `TenantMismatch`.)
-3. Relationships are loaded with `selectinload(...)` / `awaitable_attrs`, not
-   implicit lazy access (which raises under async — see below).
+1. Your application authenticates the principal and verifies their tenant membership
+   and roles before constructing `Context`.
+2. Each actor/request receives a fresh session, bound before application data is
+   loaded or attached. Never share an `AsyncSession` between concurrent tasks.
+3. Models and policy configuration are complete before calling `install()`.
+4. Queries and writes use the supported ORM paths described below.
+5. The application checks action permissions before mutation, and uses database
+   constraints and transaction handling appropriate to its consistency needs.
 
-## What is enforced
+Rebinding to a different tenant raises `TenantMismatch`. Rebinding within the same
+tenant is allowed, but it does **not** clear loaded objects or retroactively revoke
+access. SQLAlchemy's identity map can return an already-loaded object without a
+query. Treat an actor or role change as a reason to open a new session.
 
-| Guarantee | Mechanism | Proven by |
-|-----------|-----------|-----------|
-| Collection reads return only in-tenant, policy-permitted rows | `do_orm_execute` read guard applies tenant + read predicate via `with_loader_criteria` | `test_read_filter.py` |
-| Relationship loads (lazy + eager) are scoped too | `with_loader_criteria` propagation | `test_relationship_loads.py`, `test_adversarial.py` |
-| `session.get()` cannot fetch a foreign row | read guard applies on the get's DB load | `test_get_behavior.py`, `test_adversarial::test_no_leak_via_session_get` |
-| Object checks can't confirm a foreign/unauthorised row | `EXISTS (… AND <tenant> AND <predicate>)` | `test_exists_check.py`, `test_adversarial_orm::*` |
-| Inserts are stamped with the session's tenant | `before_flush` write guard | `test_before_flush.py` |
-| Forged-tenant inserts are refused | `before_attach` guard (at construction) / write guard (after attach) | `test_adversarial::test_no_leak_via_forged_create`, `test_before_flush.py` |
-| A row cannot be moved across tenants | `before_flush` dirty scan | `test_adversarial::test_no_leak_via_cross_tenant_update` |
-| A foreign object cannot be `add`/`merge`'d into a session | `before_attach` guard | `test_adversarial_orm::test_no_leak_via_{merge,detached_reattach}` |
-| `merge()` cannot resurrect a foreign row | read-scoped merge load + write guard at flush | `test_adversarial_orm::test_no_leak_via_merge` |
-| A session can't be rebound to another tenant | `TenantMismatch` on `bind` | `test_adversarial_orm::test_rebind_to_different_tenant_raises` |
-| A model shipped without a tenant column fails closed | `install()` validation | `test_discovery_validation.py`, `test_per_model_column.py` |
-| `bypass` does not leak across concurrent tasks | `ContextVar` scoping | `test_bypass_isolation.py` |
+## Automatic enforcement
 
-Single-table and joined-table inheritance, composite primary keys, and UUID/non-int
-ids are covered by the same guarantees (`test_polymorphic.py`,
-`test_adversarial_orm::test_single_table_inheritance_is_tenant_filtered`,
-`test_composite_and_uuid.py`).
+The test links below map the behavior to repository evidence. They describe the
+tested paths, rather than a claim about every possible SQLAlchemy operation.
 
-## What is NOT enforced (the sharp edges)
+| Behavior | Mechanism | Tests |
+| --- | --- | --- |
+| Collection reads are narrowed to tenant and read policy | `do_orm_execute` with `with_loader_criteria` | [Read filtering](https://github.com/jestatsio/purview/blob/main/tests/integration/test_read_filter.py) |
+| Supported relationship loads are filtered | Criteria applied to eager and lazy load statements | [Relationship loads](https://github.com/jestatsio/purview/blob/main/tests/integration/test_relationship_loads.py) |
+| `session.get()` database loads obey read criteria | Read guard on the database query | [Get behavior](https://github.com/jestatsio/purview/blob/main/tests/integration/test_get_behavior.py) |
+| New objects with no tenant ID receive the bound tenant | `before_flush` guard | [Flush guards](https://github.com/jestatsio/purview/blob/main/tests/integration/test_before_flush.py) |
+| Foreign tenant IDs are rejected on object attachment or insert | `before_attach` and `before_flush` guards | [Adversarial writes](https://github.com/jestatsio/purview/blob/main/tests/integration/test_adversarial.py) |
+| Dirty objects cannot change their tenant away from the bound tenant | `before_flush` dirty-object check | [Write guard edges](https://github.com/jestatsio/purview/blob/main/tests/integration/test_write_guard_edges.py) |
+| Detached cross-tenant objects cannot be added through supported paths | Attach guard and merge/flush handling | [Adversarial ORM paths](https://github.com/jestatsio/purview/blob/main/tests/integration/test_adversarial_orm.py) |
+| Rebinding to another tenant is rejected | `TenantMismatch` | [Rebinding tests](https://github.com/jestatsio/purview/blob/main/tests/integration/test_adversarial_orm.py) |
+| Missing tenant fields fail during installation | Mapper discovery and validation | [Discovery validation](https://github.com/jestatsio/purview/blob/main/tests/integration/test_discovery_validation.py) |
 
-These are **outside the boundary by design** — know them:
+With asynchronous sessions, use `selectinload(...)` or
+`AsyncAttrs.awaitable_attrs` for relationships. Implicit lazy access that requires
+I/O can raise SQLAlchemy's `MissingGreenlet` error.
 
-- **Raw SQL and Core `text()`** — Purview shapes ORM statements, not hand-written
-  SQL. `session.execute(text("SELECT ..."))` sees every tenant
-  (`test_adversarial_orm::test_raw_text_sql_is_not_filtered`). Don't hand-write
-  tenant-sensitive SQL. `install(warn_on_unfiltered=True)` raises a `PurviewWarning`
-  when a raw/non-ORM statement runs on a bound session, or when any query runs on an
-  unbound one — an **advisory** development aid, not a control; the boundary above is
-  unchanged whether or not warnings are on.
-- **Unbound sessions** — a session with no bound context is not filtered. This is how
-  you seed and run migrations; never serve a request on one.
-- **`bypass(reason=...)` blocks** — enforcement is intentionally suspended. Keep them
-  short, greppable, and out of request paths.
-- **Implicit lazy loads under async** — these raise `MissingGreenlet` (they do *not*
-  silently leak — `test_adversarial_orm::test_implicit_lazy_load_raises_rather_than_leaking`).
-  Use `selectinload` / `awaitable_attrs`.
+Single-table and joined-table inheritance, composite keys, and UUID keys have
+dedicated coverage in [polymorphic tests](https://github.com/jestatsio/purview/blob/main/tests/integration/test_polymorphic.py)
+and [key tests](https://github.com/jestatsio/purview/blob/main/tests/integration/test_composite_and_uuid.py).
+Configure inherited policies on the base mapped model.
 
-## Within-tenant default
+## Checks your application must call
 
-By default a scoped model with no read rule is visible tenant-wide (tenant isolation
-still applies). `install(..., strict=True)` flips this to within-tenant default deny.
-The **cross-tenant boundary is enforced identically in both modes** — `strict` only
-governs models that have no rule of their own.
+| Operation | Required call | What it checks |
+| --- | --- | --- |
+| Update an existing object | `await pv.authorize(session, "update", obj)` | Existing primary key, tenant, and governing action predicate |
+| Delete an existing object | `await pv.authorize(session, "delete", obj)` | Existing primary key, tenant, and governing action predicate |
+| Validate a proposed object | `pv.validate_create(session, obj)` | Proposed tenant and all registered create rules |
+| Check multiple IDs | `await pv.authorized_ids(session, action, Model, ids)` | Allowed subset using the same action predicate |
 
-`Purview.audit()` (and `install(audit="warn"|"raise")`) reports the scoped models that
-fall into this tenant-wide bucket, so an accidentally-unruled model is caught at
-startup rather than in production. Under `strict=True` those models default-deny, so
-the audit finds nothing.
+Call checks **before modifying objects**. Authorization queries can trigger
+autoflush, and checks evaluate stored row values rather than validating every
+proposed field change. Use database transactions, locks, constraints, or additional
+application validation where concurrent changes matter. Purview does not make a
+separate check and later write atomic by itself.
 
-## Reporting
+The ordinary flush guard handles tenant constraints, not the above fine-grained
+action rules. In particular, registering a create rule does not cause a flush to
+evaluate it.
 
-Found a way to cross the boundary? See [SECURITY.md](https://github.com/jestatsio/purview/blob/main/SECURITY.md). The in-scope
-definition there matches this document.
+Checks are covered by [EXISTS tests](https://github.com/jestatsio/purview/blob/main/tests/integration/test_exists_check.py),
+[create-rule tests](https://github.com/jestatsio/purview/blob/main/tests/integration/test_create_rules.py),
+and [authorization regressions](https://github.com/jestatsio/purview/blob/main/tests/integration/test_authorization_regressions.py).
+The regression suite includes preserving flush guards and nested reads during
+authorization-query autoflush.
+
+## Outside automatic enforcement
+
+| Path | Boundary |
+| --- | --- |
+| Raw SQL, `text()`, SQLAlchemy Core tables, direct connections | No automatic tenant or policy filtering |
+| Bulk `INSERT`, `UPDATE`, or `DELETE`, including `session.execute(update(Model))` | Bypasses object-level flush checks and is not automatically scoped |
+| Unbound sessions | No automatic filtering or tenant checks |
+| Explicit `bypass(reason=...)` blocks | Automatic guards are suspended |
+| Models marked global | No automatic tenant or row filtering, even in strict mode |
+| Objects already in memory or loaded before binding | No retroactive filtering or revocation |
+| Database cascades, triggers, and external writers | Enforced by your database and application design |
+| Field-level permissions | Enforced by input validation and serialization |
+
+Opt-in `warn_on_unfiltered=True` emits advisory warnings for recognized unfiltered
+operations. It does not block them and is not an exhaustive detector of unsupported
+paths.
+
+The bypass uses a `ContextVar` and resets on exit. Independently created request
+tasks remain isolated, as exercised by
+[bypass isolation tests](https://github.com/jestatsio/purview/blob/main/tests/integration/test_bypass_isolation.py).
+Child tasks created inside a bypass block inherit that context, so do not start
+ordinary request work there. Use a dedicated maintenance session and do not reuse
+its loaded objects in a request.
+
+## Default visibility
+
+A scoped model with no read rule is tenant-wide by default. `strict=True` changes
+that to default deny. A registered read rule that contributes no granting predicates
+denies access in either mode. An action without its own rules falls back to `read`.
+
+`pv.audit()` and `install(audit="warn" | "raise")` surface tenant-wide models.
+Auditing does not prove that a registered rule is sufficiently restrictive. Review
+policy logic and test realistic actors against representative data.
+
+## Database integrity
+
+Purview is an application-layer control. Tenant-aware foreign keys, unique
+constraints, and database row-level security can provide additional protections.
+Purview does not validate arbitrary relationship assignments or automatically
+create tenant-aware schema constraints.
+
+## Report a vulnerability
+
+See the [security policy](https://github.com/jestatsio/purview/blob/main/SECURITY.md)
+for private reporting. Include a minimal reproduction, the query or write path,
+session binding order, model definitions, and installed versions.

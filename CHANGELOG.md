@@ -6,6 +6,40 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-02
+
+### Fixed
+
+- Authorization queries now bypass read filtering only for their own statement.
+  Autoflush continues to enforce tenant write guards, and queries issued by flush
+  hooks remain filtered. This closes a cross-tenant write path during `authorize`
+  and batch authorization checks.
+- Inherited models now use their governing base-model policy consistently across
+  reads, checks, explicit filtering, create validation, and explanations. Batch
+  checks for a subclass exclude sibling and base-only rows.
+- Global-model checks work without a tenant column. Authorization also supports
+  primary-key attributes whose names differ from their database columns.
+- FastAPI role guards and explicit authorized queries honor implied roles.
+- Tracker request validation returns HTTP 422 for malformed input. Its smoke
+  tests use disposable databases or schemas and never modify the demo database.
+
+### Added
+
+- `sqlite` and `postgres` installation extras for async database drivers, plus an
+  `example` extra for the tracker tooling.
+- A runnable SQLite quickstart and redesigned documentation with installation,
+  policy, FastAPI, debugging, and enforcement-boundary guides.
+
+### Changed
+
+- Streamlined the README and contributor setup around tested examples and locked
+  dependencies. Refreshed development and documentation dependencies.
+- CI validates formatting, typing, strict documentation builds, package metadata,
+  source-distribution builds, clean wheel installs, and the tracker alongside the
+  SQLite/PostgreSQL test matrix on Python 3.11 through 3.14.
+- PyPI releases reuse the full CI gate. GitHub Releases and distribution assets
+  are created only after successful PyPI publication.
+
 ## [0.3.0] - 2026-06-14
 
 ### Added
@@ -102,7 +136,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (parametrized over SQLite and Postgres), an adversarial leak suite, and a
   runnable FastAPI example app.
 
-[Unreleased]: https://github.com/jestatsio/purview/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/jestatsio/purview/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/jestatsio/purview/releases/tag/v0.3.1
 [0.3.0]: https://github.com/jestatsio/purview/releases/tag/v0.3.0
 [0.2.0]: https://github.com/jestatsio/purview/releases/tag/v0.2.0
 [0.1.1]: https://github.com/jestatsio/purview/releases/tag/v0.1.1

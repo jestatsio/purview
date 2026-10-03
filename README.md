@@ -1,258 +1,127 @@
 # Purview
 
+**Authorization that speaks SQLAlchemy.**
+
 [![CI](https://github.com/jestatsio/purview/actions/workflows/ci.yml/badge.svg)](https://github.com/jestatsio/purview/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/purview-authz)](https://pypi.org/project/purview-authz/)
 [![Python](https://img.shields.io/pypi/pyversions/purview-authz)](https://pypi.org/project/purview-authz/)
-[![Docs](https://img.shields.io/badge/docs-jestatsio.github.io-blue)](https://jestatsio.github.io/purview/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Documentation](https://img.shields.io/badge/docs-online-087e8b)](https://jestatsio.github.io/purview/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**Row-level authorization and multi-tenancy for FastAPI + SQLAlchemy.** Define a
-policy once as SQLAlchemy column expressions and get both yes/no checks and query
-filtering from the same rule — so the check and the filter can never disagree.
+Row-level authorization and tenant isolation for SQLAlchemy 2.0, with a lightweight
+FastAPI adapter. Write policies as Python functions returning SQLAlchemy predicates.
+Purview uses those predicates to filter ORM reads and answer explicit permission
+checks in the database. No policy server or separate language required.
 
-> Drift between "can this actor do this?" and "which rows can they see?" is a data
-> leak. Purview makes both come from one definition, so they cannot drift.
-
-```python
-@policy.rule(Post, "read")
-def read_post(ctx: Context) -> list[ColumnElement[bool]]:
-    rules = []
-    if ctx.has_role("author"):
-        rules.append(Post.author_id == ctx.user_id)   # authors see their own
-    if ctx.has_role("org_admin"):
-        rules.append(true())                           # admins see the whole tenant
-    return rules                                       # OR-combined; empty = deny
-```
-
-That one rule now powers a filtered `select(Post)` **and** an
-`authorize(session, "read", post)` check.
-
-## Why this exists
-
-Authentication generalizes; authorization does not, because it is welded to your
-domain model and data layer. The hard, valuable part is **data filtering**:
-shaping queries so a user only ever loads rows they're allowed to see, pushed into
-SQL rather than filtered in Python after the fact. [Oso](https://www.osohq.com/)
-solved this well and then deprecated its open-source library, leaving no idiomatic
-Python answer. Purview targets that gap for the FastAPI + SQLAlchemy stack
-specifically — in-process, async-first, no external policy service.
+**[Documentation](https://jestatsio.github.io/purview/)** ·
+[Quickstart](https://jestatsio.github.io/purview/quickstart/) ·
+[API reference](https://jestatsio.github.io/purview/reference/) ·
+[Security boundary](https://jestatsio.github.io/purview/THREAT_MODEL/)
 
 ## Install
 
+Requires **Python 3.11+** and **SQLAlchemy 2.0**. The distribution is
+`purview-authz`, and the Python import is `purview`.
+
 ```bash
-pip install purview-authz            # core + SQLAlchemy
-pip install "purview-authz[fastapi]" # plus the FastAPI adapter
+# A new or existing uv project
+uv add "purview-authz[sqlite]"
+
+# Or use pip in a virtual environment
+python -m pip install "purview-authz[sqlite]"
 ```
 
-The distribution is `purview-authz`; the import package is `purview`. Requires
-Python 3.11+ and SQLAlchemy 2.0+.
+Choose extras for your application:
 
-## Quickstart
+| Install | Includes |
+| --- | --- |
+| `purview-authz` | Purview and SQLAlchemy's asyncio support |
+| `purview-authz[sqlite]` | Also includes the `aiosqlite` driver |
+| `purview-authz[postgres]` | Also includes the `asyncpg` driver |
+| `purview-authz[fastapi,postgres]` | FastAPI adapter and PostgreSQL driver |
+
+## One policy, filtered reads
 
 ```python
-from sqlalchemy import true
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from purview import Context, Policy, READ
+from sqlalchemy import select
+from purview import READ, Context, Policy
 from purview.sqlalchemy import install
 
-class Base(DeclarativeBase): ...
-
-class Org(Base):                       # the tenant root — global
-    __tablename__ = "org"
-    id: Mapped[int] = mapped_column(primary_key=True)
-
-class Post(Base):                      # tenant-scoped (has the tenant column)
-    __tablename__ = "post"
-    id: Mapped[int] = mapped_column(primary_key=True)
-    org_id: Mapped[int] = mapped_column()
-    author_id: Mapped[int] = mapped_column()
-
 policy = Policy()
-policy.global_model(Org)               # opt Org out of tenant scoping
+
 
 @policy.rule(Post, READ)
-def read_post(ctx: Context):
+def read_posts(ctx: Context):
     return [Post.author_id == ctx.user_id] if ctx.has_role("author") else []
 
-pv = install(Base, policy, tenant_column="org_id")   # wires the guards; validates models
-```
 
-Bind a request's session to its actor, then query normally — reads are filtered
-automatically:
+pv = install(Base, policy, strict=True)
 
-```python
-async with async_session() as session:
+async with sessions() as session:
     pv.bind(session, Context(user_id=42, tenant_id=1, roles={"author"}))
-
-    posts = await session.scalars(select(Post))          # only org 1 + authored by 42
-    one   = await session.get(Post, 99)                  # None if not visible
-    ok    = await pv.authorize(session, "update", post)  # yes/no for one object
-    ids   = await pv.authorized_ids(session, "read", Post, [1, 2, 3])  # the allowed subset
+    posts = (await session.scalars(select(Post))).all()
 ```
 
-## Core concepts
+Here, `Base`, `Post`, and `sessions` are your application's SQLAlchemy models and
+async session factory. The tenant predicate and read policy apply together, so this
+query returns only posts by author 42 in tenant 1.
 
-**One definition, two forms.** A rule returns boolean `ColumnElement` predicates.
-As a `.where(...)` they filter a collection; wrapped in
-`EXISTS (SELECT 1 ... AND <predicate>)` they check a single object. The database
-evaluates both, so relationship and join predicates work without re-implementing
-SQL in Python.
+**[Run the complete SQLite quickstart](https://jestatsio.github.io/purview/quickstart/)**
+or inspect [the runnable script](examples/quickstart.py). It creates its own models,
+database, and sample data.
 
-**Roles select predicates.** An actor's tenant-scoped roles decide which
-predicates apply for `(action, model)`. Grants are OR-combined; **no granting role
-means no rows — default deny.**
+A registered rule returning `[]` denies access. The example enables `strict=True`,
+which also denies access to scoped models with no read rule. Without strict mode,
+those models are readable throughout the bound tenant.
 
-**Tenancy is the session boundary.** One session is bound to exactly one tenant.
-A `do_orm_execute` hook scopes every read (including lazy and eager relationship
-loads) to that tenant; a `before_flush` hook auto-stamps the tenant on inserts and
-refuses writes that would cross the boundary.
+## What Purview handles
 
-**Secure by default.** Every mapped model is tenant-scoped automatically. Opt a
-model out with `policy.global_model(...)`. `install()` **raises** if a non-global
-model lacks the tenant column — an unscoped table fails at startup, never leaks at
-runtime.
+- **ORM read filtering:** selects, database loads through `session.get()`, and
+  supported eager or awaitable relationship loads on a bound session.
+- **Tenant checks on object writes:** stamp tenant IDs on new objects and reject
+  cross-tenant attachments and tenant changes during normal ORM flushes.
+- **Explicit authorization:** `await pv.authorize(...)`, batch
+  `await pv.authorized_ids(...)`, and `pv.validate_create(...)`.
+- **Policy tools:** role hierarchies, per-model tenant fields, predicate explanations,
+  and audits for models left readable tenant-wide.
 
-**`read` drives filtering.** It is the action that shapes collections. Other
-actions are instance-level checks; `update`/`delete` reuse the `read` predicate
-unless you register a stricter rule for them.
+Use a **fresh session per actor/request**, and bind it before loading application
+data. Your app authenticates the actor and resolves trusted tenant membership and
+roles. Call authorization helpers before modifying or deleting an object, and call
+`validate_create()` before adding it when you use create rules.
 
-**Within-tenant default.** A scoped model with *no* read rule is visible
-tenant-wide (tenant isolation still applies). Pass `install(..., strict=True)` to
-flip this to within-tenant **default deny** — every model then needs an explicit
-rule to grant any access. The cross-tenant boundary is enforced identically in
-both modes.
+Raw SQL, Core statements, bulk DML, unbound sessions, and explicit bypass blocks
+are outside automatic enforcement. Global models are exempt from automatic
+filtering. Purview is an application-layer control, not database row-level security.
+Read the [security boundary](https://jestatsio.github.io/purview/THREAT_MODEL/) before
+integrating it into request handlers.
 
-## Authoring and debugging policies
+## Build with Purview
 
-**Predicate helpers** for the common patterns:
+| Guide | Start here for |
+| --- | --- |
+| [Installation](https://jestatsio.github.io/purview/installation/) | Drivers, extras, and a clean environment |
+| [Quickstart](https://jestatsio.github.io/purview/quickstart/) | A runnable SQLite example and how it works |
+| [Writing policies](https://jestatsio.github.io/purview/policies/) | Grants, defaults, create rules, and tenant configuration |
+| [FastAPI integration](https://jestatsio.github.io/purview/fastapi/) | Request dependencies, explicit checks, and HTTP errors |
+| [Debugging policies](https://jestatsio.github.io/purview/debugging/) | Explain SQL and audit visibility |
+| [Migrating from Oso](https://jestatsio.github.io/purview/MIGRATING_FROM_OSO/) | Map existing policy concepts to Purview |
+| [Tracker example](examples/tracker/) | FastAPI, Alembic, and PostgreSQL together |
 
-```python
-from purview.predicates import owned_by, in_values
-
-@policy.rule(Post, READ)
-def read_post(ctx):
-    rules = [owned_by(Post.author_id, ctx)]            # Post.author_id == ctx.user_id
-    if ctx.has_role("editor"):
-        rules.append(in_values(Post.section_id, ctx.sections))  # empty -> deny
-    return rules
-```
-
-**Role hierarchies** — a higher role grants the lower ones, expanded once at `bind`:
-
-```python
-policy.role_implies("admin", "editor")     # admin satisfies has_role("editor")
-```
-
-**Explain** the exact predicate the guard would apply — no database round-trip:
-
-```python
-print(pv.explain(session, "read", Post))   # or pass a bare Context
-# tenant scope  : post.org_id = 1
-# row predicate : post.author_id = 42
-```
-
-**Audit** for models left visible tenant-wide, and **warn** on the unfiltered sharp
-edges — both opt-in:
-
-```python
-pv = install(Base, policy, tenant_column="org_id",
-             audit="warn",            # report scoped models with no read rule
-             warn_on_unfiltered=True) # PurviewWarning on raw text()/unbound queries
-pv.audit().tenant_wide_models        # inspect the same report at any time
-```
-
-## The enforcement boundary
-
-Inside the boundary: ORM `select`s, `session.get`, relationship loads, and flushes
-on a bound session.
-
-Outside the boundary (documented, not enforced):
-
-- **Raw SQL and Core `text()`** — Purview shapes ORM statements, not hand-written SQL.
-- **Implicit lazy loads under async** — these raise `MissingGreenlet` in SQLAlchemy
-  regardless; use `selectinload(...)` or `await obj.awaitable_attrs.x`. Eager and
-  awaitable lazy loads *are* filtered.
-- **Unbound sessions** — a session with no bound context is not filtered (this is
-  how you seed and run migrations).
-
-### Escape hatch
-
-One loud, greppable bypass for admin tooling and migrations:
-
-```python
-from purview.sqlalchemy import bypass
-
-with bypass(reason="nightly billing rollup"):
-    ...   # enforcement stands down on this task; the reason is logged at WARNING
-```
-
-## FastAPI
-
-```python
-from purview.fastapi import context_binder, authorize_or_403, install_error_handlers
-
-install_error_handlers(app)                              # PurviewForbidden -> 403
-bound = context_binder(pv, get_session, get_context)     # binds the actor per request
-
-@app.get("/posts")
-async def list_posts(session: AsyncSession = Depends(bound)):
-    return (await session.scalars(select(Post))).all()   # auto-filtered
-
-@app.patch("/posts/{post_id}")
-async def edit(post_id: int, session: AsyncSession = Depends(bound)):
-    post = await session.get(Post, post_id)              # 404 if not visible
-    await authorize_or_403(pv, session, "update", post)  # 403 if not permitted
-    ...
-```
-
-See [`tests/examples/test_blog_app.py`](tests/examples/test_blog_app.py) for a
-complete, runnable app.
-
-## Documentation
-
-**Full docs: https://jestatsio.github.io/purview/**
-
-- [Design](docs/DESIGN.md) — the architecture and the keystone idea.
-- [Threat model](docs/THREAT_MODEL.md) — what is and isn't enforced, each guarantee
-  mapped to the test that proves it.
-- [Migrating from Oso](docs/MIGRATING_FROM_OSO.md).
-- [Example app](examples/tracker/) — a multi-tenant tracker (FastAPI + Alembic +
-  Postgres) exercising per-model columns, composite/UUID keys, and read/create rules.
-- [Security policy](SECURITY.md) · [Contributing](CONTRIBUTING.md) · [Releasing](RELEASING.md).
-
-## How it compares
-
-|                          | Purview | Oso (OSS) | Cerbos | Casbin |
-|--------------------------|:-------:|:---------:|:------:|:------:|
-| In-process (no network)  | ✅ | ✅ | ❌ service | ✅ |
-| SQL data filtering       | ✅ | ✅ | ✅ | ❌ |
-| One def → check + filter  | ✅ | ✅ | ➖ | ❌ |
-| SQLAlchemy 2.0 async     | ✅ | ❌ | ✅ adapter | ➖ |
-| Policy in native Python  | ✅ | Polar DSL | YAML | model+CSV |
-| Maintained               | ✅ | deprecated 2023 | ✅ | ✅ |
-
-## Scope (v1)
-
-**In:** row-level filtering, multi-tenancy as a structural concern, yes/no checks
-and query filtering from one definition, SQLAlchemy 2.0 async, FastAPI adapter.
-
-**Out (for now):** field-level authorization (belongs in serialization),
-non-SQLAlchemy ORMs, a hosted policy service, Postgres RLS as a compile target.
-
-## Development
+## Contribute
 
 ```bash
-uv run --extra dev pytest          # unit + integration + the example app
-uv run --extra dev mypy            # strict typing is a project invariant
-uv run --extra dev ruff check .
+git clone https://github.com/jestatsio/purview.git
+cd purview
+uv sync --locked --all-extras
+uv run --locked --all-extras pytest
+uv run --locked --all-extras mypy
+uv run --locked --all-extras ruff check .
+uv run --locked --all-extras mkdocs serve
 ```
 
-Postgres fidelity is exercised in CI; set `PURVIEW_TEST_POSTGRES_URL` to run the
-integration matrix against a local Postgres too.
+See [Contributing](CONTRIBUTING.md) for the development workflow and PostgreSQL
+tests, [Releasing](RELEASING.md) for the release process, and
+[Security](SECURITY.md) for private vulnerability reporting.
 
-Releases publish to PyPI on a version tag via Trusted Publishing (no stored token);
-the version is derived from the tag. See [RELEASING.md](RELEASING.md).
-
-## License
-
-MIT — see [LICENSE](LICENSE).
+MIT licensed. See [LICENSE](LICENSE).

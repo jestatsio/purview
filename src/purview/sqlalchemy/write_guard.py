@@ -22,6 +22,7 @@ from purview.core.registry import Policy
 from purview.exceptions import CrossTenantWrite
 from purview.sqlalchemy.binding import context_of
 from purview.sqlalchemy.bypass import is_bypassed
+from purview.sqlalchemy.predicates import governing_model
 
 
 def make_write_guard(
@@ -32,9 +33,10 @@ def make_write_guard(
     """Build a ``before_flush`` handler enforcing tenant ownership of writes."""
 
     def _column_for(obj: object) -> str | None:
-        if policy.is_global(type(obj)):
+        model = governing_model(type(obj))
+        if policy.is_global(model):
             return None
-        column = policy.tenant_field_for(type(obj), tenant_column)
+        column = policy.tenant_field_for(model, tenant_column)
         return column if hasattr(obj, column) else None
 
     def write_guard(session: Session, flush_context: Any, instances: Any) -> None:
@@ -86,9 +88,10 @@ def make_attach_guard(
         if is_bypassed():
             return
         ctx = context_of(session)
-        if ctx is None or policy.is_global(type(instance)):
+        model = governing_model(type(instance))
+        if ctx is None or policy.is_global(model):
             return
-        column = policy.tenant_field_for(type(instance), tenant_column)
+        column = policy.tenant_field_for(model, tenant_column)
         if not hasattr(instance, column):
             return
         current = getattr(instance, column, None)

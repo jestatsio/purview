@@ -133,3 +133,26 @@ async def test_uuid_tenant_and_user_ids(url: str) -> None:
 
             with pytest.raises(CrossTenantWrite):
                 s.add(Document(id=uuid.UUID(int=44), tenant_id=t2, title="forged"))
+
+
+@pytest.mark.parametrize("url", _backends(), ids=_BACKEND_IDS)
+async def test_primary_key_attribute_can_differ_from_database_column(url: str) -> None:
+    class Base(DeclarativeBase):
+        pass
+
+    class Document(Base):
+        __tablename__ = "renamed_key_document"
+        id: Mapped[int] = mapped_column("document_id", primary_key=True)
+        tenant_id: Mapped[int] = mapped_column(Integer)
+
+    async with _installed(Base, Policy(), "tenant_id", url) as (sm, pv):
+        async with sm() as session:
+            session.add_all([Document(id=1, tenant_id=1), Document(id=2, tenant_id=2)])
+            await session.commit()
+        async with sm() as session:
+            pv.bind(session, Context(1, 1))
+            own = await session.get(Document, 1)
+            assert own is not None
+            assert await pv.authorize(session, "read", own)
+            assert not await pv.authorize(session, "read", Document(id=2, tenant_id=2))
+            assert await pv.authorized_ids(session, "read", Document, [1, 2]) == [1]

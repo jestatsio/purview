@@ -28,6 +28,7 @@ from purview.sqlalchemy.checking import batch_check, exists_check
 from purview.sqlalchemy.creating import validate_create as _validate_create
 from purview.sqlalchemy.discovery import discover_scoped
 from purview.sqlalchemy.explanation import build_explanation
+from purview.sqlalchemy.predicates import governing_model
 from purview.sqlalchemy.read_guard import make_read_guard
 from purview.sqlalchemy.write_guard import make_attach_guard, make_write_guard
 
@@ -202,9 +203,13 @@ class Purview:
         Checks the proposed tenant and every registered ``create_rule`` for the
         model. The write guard remains the structural backstop at flush.
         """
-        column = self.policy.tenant_field_for(type(resource), self.tenant_column)
-        rules = self.policy.create_rules_for(type(resource))
-        return _validate_create(self._ctx(session), resource, column, rules)
+        model = governing_model(type(resource))
+        rules = self.policy.create_rules_for(model)
+        ctx = self._ctx(session)
+        if self.policy.is_global(model):
+            return all(rule(ctx, resource) for rule in rules)
+        column = self.policy.tenant_field_for(model, self.tenant_column)
+        return _validate_create(ctx, resource, column, rules)
 
     def _ctx(self, session: _SessionLike) -> Context[Any, Any]:
         ctx = context_of(session)
