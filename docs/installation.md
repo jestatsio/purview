@@ -1,7 +1,10 @@
 # Installation
 
-Purview runs on **Python 3.11 or newer** and **SQLAlchemy 2.0** (`>=2.0,<2.1`).
-Install `purview-authz` and import `purview`.
+Purview runs on **Python 3.11 or newer**. The published **0.3.1** release supports
+**SQLAlchemy 2.0** (`>=2.0,<2.1`). Install `purview-authz` and import `purview`.
+
+The development branch targets **SQLAlchemy 2.1** (`>=2.1.1,<2.2`). Installing from
+source therefore uses a different dependency range from the current PyPI release.
 
 ## Choose your setup
 

@@ -19,7 +19,7 @@ hide:
 
 </div>
 
-<p class="pv-meta">Python 3.11+ &nbsp; / &nbsp; SQLAlchemy 2.0 &nbsp; / &nbsp; FastAPI ready &nbsp; / &nbsp; MIT licensed</p>
+<p class="pv-meta">Python 3.11+ &nbsp; / &nbsp; SQLAlchemy 2 &nbsp; / &nbsp; FastAPI ready &nbsp; / &nbsp; MIT licensed</p>
 
 </div>
 

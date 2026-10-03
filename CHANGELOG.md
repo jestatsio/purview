@@ -6,6 +6,18 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- The development dependency now targets SQLAlchemy 2.1.1 and newer within the
+  2.1 series. The async lazy-load regression checks the underlying `MissingGreenlet`
+  when SQLite wraps it in `StatementError`.
+
+### Fixed
+
+- Preserve the quickstart's documentation include during Markdown formatting.
+  CI and documentation deployment now execute the rendered example after verifying
+  that it matches the maintained source.
+
 ## [0.3.1] - 2026-10-02
 
 ### Fixed

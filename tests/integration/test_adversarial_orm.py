@@ -8,7 +8,7 @@ import pytest
 from conftest import Env
 from models import Post, admin_ctx, author_ctx, plain_ctx
 from sqlalchemy import Integer, String, select, text
-from sqlalchemy.exc import MissingGreenlet
+from sqlalchemy.exc import MissingGreenlet, StatementError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.pool import StaticPool
@@ -81,8 +81,11 @@ async def test_raw_text_sql_is_not_filtered(env: Env) -> None:
 async def test_implicit_lazy_load_raises_rather_than_leaking(env: Env) -> None:
     async with env.bound(admin_ctx(tenant=1)) as s:
         post1 = (await s.scalars(select(Post).where(Post.id == env.ids["post1"]))).one()
-        with pytest.raises(MissingGreenlet):
+        with pytest.raises((MissingGreenlet, StatementError)) as exc_info:
             _ = post1.comments  # implicit sync lazy load under async — fails loud, no leak
+        if isinstance(exc_info.value, StatementError):
+            # SQLAlchemy 2.1's SQLite adapter wraps the same implicit-I/O error.
+            assert isinstance(exc_info.value.orig, MissingGreenlet)
 
 
 # -- A5: single-table inheritance (self-contained) --------------------------- #

@@ -8,7 +8,7 @@
 [![Documentation](https://img.shields.io/badge/docs-online-087e8b)](https://jestatsio.github.io/purview/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Row-level authorization and tenant isolation for SQLAlchemy 2.0, with a lightweight
+Row-level authorization and tenant isolation for SQLAlchemy 2, with a lightweight
 FastAPI adapter. Write policies as Python functions returning SQLAlchemy predicates.
 Purview uses those predicates to filter ORM reads and answer explicit permission
 checks in the database. No policy server or separate language required.
@@ -20,7 +20,8 @@ checks in the database. No policy server or separate language required.
 
 ## Install
 
-Requires **Python 3.11+** and **SQLAlchemy 2.0**. The distribution is
+Requires **Python 3.11+**. The published **0.3.1** release supports **SQLAlchemy 2.0**.
+The development branch targets **SQLAlchemy 2.1.1+**. The distribution is
 `purview-authz`, and the Python import is `purview`.
 
 ```bash
