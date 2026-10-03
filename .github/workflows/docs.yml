@@ -7,8 +7,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
@@ -28,7 +26,9 @@ jobs:
           python-version: "3.12"
 
       - name: Build site
-        run: uv run --extra docs mkdocs build --strict
+        run: uv run --locked --extra docs mkdocs build --strict
+
+      - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v5
         with:
@@ -36,7 +36,11 @@ jobs:
 
   deploy:
     needs: build
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

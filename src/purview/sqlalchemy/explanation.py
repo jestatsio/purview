@@ -22,6 +22,7 @@ from purview.core.registry import Policy
 from purview.sqlalchemy.predicates import (
     _FALSE_TYPE,
     governing_action,
+    governing_model,
     row_predicate,
     tenant_predicate,
 )
@@ -36,8 +37,9 @@ def build_explanation(
     strict: bool = False,
 ) -> PredicateExplanation:
     """Compile the tenant + row predicate (and per-rule breakdown) for inspection."""
-    gov = governing_action(policy, model, action)
-    is_global = policy.is_global(model)
+    governed = governing_model(model)
+    gov = governing_action(policy, governed, action)
+    is_global = policy.is_global(governed)
 
     row = row_predicate(policy, ctx, model, action, strict)
     row_sql = compile_predicate(row)
@@ -47,13 +49,13 @@ def build_explanation(
     tenant_sql: str | None = None
     combined: ColumnElement[bool] = row
     if not is_global:
-        tenant_col = policy.tenant_field_for(model, tenant_column)
-        tenant = tenant_predicate(model, tenant_col, ctx.tenant_id)
+        tenant_col = policy.tenant_field_for(governed, tenant_column)
+        tenant = tenant_predicate(governed, tenant_col, ctx.tenant_id)
         tenant_sql = compile_predicate(tenant)
         combined = and_(tenant, row)
 
     contributions: list[RuleContribution] = []
-    for fn in policy.rules_for(model, gov):
+    for fn in policy.rules_for(governed, gov):
         branches = fn(ctx)
         name = getattr(fn, "__qualname__", repr(fn))
         if not branches:

@@ -5,10 +5,11 @@ build-backend = "hatchling.build"
 [project]
 name = "purview-authz"
 dynamic = ["version"]
-description = "Row-level authorization and multi-tenancy for FastAPI + SQLAlchemy: define a policy once as column expressions and get both yes/no checks and query filtering from the same rule."
+description = "Row-level authorization and tenant isolation for SQLAlchemy and FastAPI."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "Eric Hare" }]
 keywords = [
   "authorization", "multi-tenancy", "sqlalchemy", "fastapi",
@@ -18,7 +19,6 @@ classifiers = [
   "Development Status :: 3 - Alpha",
   "Framework :: FastAPI",
   "Intended Audience :: Developers",
-  "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
@@ -31,6 +31,9 @@ dependencies = ["sqlalchemy[asyncio]>=2.0,<2.1"]
 
 [project.optional-dependencies]
 fastapi = ["fastapi>=0.110"]
+sqlite = ["aiosqlite>=0.20"]
+postgres = ["asyncpg>=0.29"]
+example = ["alembic>=1.13", "uvicorn>=0.30"]
 dev = [
   "pytest>=8",
   "pytest-asyncio>=0.23",
@@ -51,7 +54,7 @@ docs = [
 
 [project.urls]
 Documentation = "https://jestatsio.github.io/purview/"
-Homepage = "https://github.com/jestatsio/purview"
+Homepage = "https://jestatsio.github.io/purview/"
 Repository = "https://github.com/jestatsio/purview"
 Issues = "https://github.com/jestatsio/purview/issues"
 Changelog = "https://github.com/jestatsio/purview/blob/main/CHANGELOG.md"
@@ -75,7 +78,6 @@ select = ["E", "F", "I", "B", "UP", "S", "C4", "SIM", "RUF"]
 "src/purview/fastapi/**" = ["B008"]  # Depends(...) in defaults is the FastAPI idiom
 "tests/examples/**" = ["S101", "RUF012", "B008"]
 "examples/**" = ["S101", "RUF012", "B008", "E501"]  # runnable example apps
-"spike/**" = ["S101", "B018"]
 
 [tool.mypy]
 python_version = "3.11"

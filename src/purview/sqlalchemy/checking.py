@@ -19,8 +19,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from purview.core.context import Context
 from purview.core.registry import Policy
-from purview.sqlalchemy.bypass import _suppress
-from purview.sqlalchemy.predicates import row_predicate, tenant_predicate
+from purview.sqlalchemy.bypass import _CHECK_EXECUTION_OPTION
+from purview.sqlalchemy.predicates import row_predicate, scope_predicate
 
 
 def _primary_key_columns(model: type) -> Sequence[Any]:
@@ -38,19 +38,24 @@ async def exists_check(
 ) -> bool:
     """Whether ``ctx`` may perform ``action`` on the single ``resource`` row."""
     model = type(resource)
-    column = policy.tenant_field_for(model, tenant_column)
-    pk_match = [col == getattr(resource, col.key) for col in _primary_key_columns(model)]
+    mapper: Any = inspect(model)
+    pk_match = [
+        col == getattr(resource, mapper.get_property_by_column(col).key)
+        for col in _primary_key_columns(model)
+    ]
     inner = (
         select(literal(1))
         .select_from(model)
         .where(
             *pk_match,
-            tenant_predicate(model, column, ctx.tenant_id),
+            scope_predicate(policy, ctx, model, tenant_column),
             row_predicate(policy, ctx, model, action, strict),
         )
     )
-    with _suppress():  # the predicate is self-contained; don't let the guard re-add criteria
-        return bool(await session.scalar(select(inner.exists())))
+    # Skip only this query's redundant read criteria. Autoflush and any reads
+    # issued by flush hooks retain their normal enforcement.
+    stmt = select(inner.exists()).execution_options(**{_CHECK_EXECUTION_OPTION: True})
+    return bool(await session.scalar(stmt))
 
 
 async def batch_check(
@@ -68,20 +73,27 @@ async def batch_check(
     For a single-column primary key, ``ids`` and the result are scalar values; for a
     composite key, they are tuples of the key columns in primary-key order.
     """
-    column = policy.tenant_field_for(model, tenant_column)
-    tenant = tenant_predicate(model, column, ctx.tenant_id)
+    tenant = scope_predicate(policy, ctx, model, tenant_column)
     row = row_predicate(policy, ctx, model, action, strict)
     pk_cols = list(_primary_key_columns(model))
 
     if len(pk_cols) == 1:
         pk = pk_cols[0]
-        stmt = select(pk).where(pk.in_(list(ids)), tenant, row)
-        with _suppress():
-            return list(await session.scalars(stmt))
+        stmt = (
+            select(pk)
+            .select_from(model)
+            .where(pk.in_(list(ids)), tenant, row)
+            .execution_options(**{_CHECK_EXECUTION_OPTION: True})
+        )
+        return list(await session.scalars(stmt))
 
     keys = [tuple(i) for i in ids]
-    composite = select(*pk_cols).where(tuple_(*pk_cols).in_(keys), tenant, row)
-    with _suppress():
-        rows = (await session.execute(composite)).all()
+    composite = (
+        select(*pk_cols)
+        .select_from(model)
+        .where(tuple_(*pk_cols).in_(keys), tenant, row)
+        .execution_options(**{_CHECK_EXECUTION_OPTION: True})
+    )
+    rows = (await session.execute(composite)).all()
     result: list[Any] = [tuple(r) for r in rows]
     return result

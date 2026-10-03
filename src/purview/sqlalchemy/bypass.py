@@ -17,6 +17,9 @@ from contextlib import contextmanager
 _log = logging.getLogger("purview.bypass")
 
 _active: contextvars.ContextVar[bool] = contextvars.ContextVar("purview_bypass", default=False)
+# Only Purview's self-contained check statement skips redundant read criteria.
+# Context-wide suppression would also bypass nested reads during autoflush.
+_CHECK_EXECUTION_OPTION = "_purview_self_contained_check"
 
 
 def is_bypassed() -> bool:
@@ -31,24 +34,12 @@ def bypass(reason: str) -> Iterator[None]:
     A non-empty ``reason`` is required and logged at WARNING — bypasses are meant
     to be visible in logs and greppable in code::
 
-        with policy.bypass(reason="nightly billing rollup"):
+        with bypass(reason="nightly billing rollup"):
             ...
     """
     if not reason or not reason.strip():
         raise ValueError("bypass(reason=...) requires a non-empty reason")
     _log.warning("purview enforcement bypassed: %s", reason)
-    token = _active.set(True)
-    try:
-        yield
-    finally:
-        _active.reset(token)
-
-
-@contextmanager
-def _suppress() -> Iterator[None]:
-    """Internal, silent suppression used while Purview builds its own fully
-    self-contained predicates (e.g. the EXISTS check), so the guards do not
-    double-apply criteria to queries Purview itself issues."""
     token = _active.set(True)
     try:
         yield

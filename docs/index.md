@@ -1,77 +1,114 @@
-# Purview
+---
+hide:
+  - navigation
+  - toc
+---
 
-**Row-level authorization and multi-tenancy for FastAPI + SQLAlchemy.** Define a
-policy once as SQLAlchemy column expressions and get both yes/no checks and query
-filtering from the same rule — so the check and the filter can never disagree.
+<div class="pv-hero" markdown>
+
+<p class="pv-eyebrow">Python policies. SQL enforcement.</p>
+
+# Authorization that speaks SQLAlchemy.
+
+<p class="pv-lead">Keep tenant data scoped and row permissions close to your models. Write a policy in Python, then use it for filtered ORM reads and explicit permission checks.</p>
+
+<div class="pv-actions" markdown>
+
+[Start building](quickstart.md){ .md-button .md-button--primary }
+[Explore the API](reference.md){ .md-button }
+
+</div>
+
+<p class="pv-meta">Python 3.11+ &nbsp; / &nbsp; SQLAlchemy 2.0 &nbsp; / &nbsp; FastAPI ready &nbsp; / &nbsp; MIT licensed</p>
+
+</div>
+
+<div class="pv-grid" markdown>
+
+<div class="pv-card" markdown>
+
+### One policy definition
+
+SQLAlchemy predicates power both collection filtering and explicit object checks. The database evaluates your rules.
+
+</div>
+
+<div class="pv-card" markdown>
+
+### A tenant per session
+
+Bind an actor to a fresh session. Purview adds tenant criteria to ORM reads and checks tenant IDs during object writes.
+
+</div>
+
+<div class="pv-card" markdown>
+
+### Fits your Python stack
+
+Use familiar models, queries, and tools. Add FastAPI dependencies when you need them. No separate policy service.
+
+</div>
+
+</div>
+
+## Start with a rule
+
+This policy lets authors read their own posts. The session's tenant filter applies
+alongside it.
 
 ```python
-@policy.rule(Post, "read")
-def read_post(ctx: Context) -> list[ColumnElement[bool]]:
-    rules = []
-    if ctx.has_role("author"):
-        rules.append(Post.author_id == ctx.user_id)   # authors see their own
-    if ctx.has_role("org_admin"):
-        rules.append(true())                           # admins see the whole tenant
-    return rules                                       # OR-combined; empty = deny
-```
-
-That one rule powers a filtered `select(Post)` **and** an
-`authorize(session, "read", post)` check.
-
-## Install
-
-```bash
-pip install purview-authz            # core + SQLAlchemy
-pip install "purview-authz[fastapi]" # plus the FastAPI adapter
-```
-
-The distribution is `purview-authz`; the import package is `purview`. Requires
-Python 3.11+ and SQLAlchemy 2.0+.
-
-## Quickstart
-
-```python
-from sqlalchemy import select, true
-from purview import Context, Policy, READ
+from purview import READ, Context, Policy
 from purview.sqlalchemy import install
 
 policy = Policy()
-policy.global_model(Org)               # opt the tenant root out of scoping
+
 
 @policy.rule(Post, READ)
-def read_post(ctx: Context):
+def read_posts(ctx: Context):
     return [Post.author_id == ctx.user_id] if ctx.has_role("author") else []
 
-pv = install(Base, policy, tenant_column="org_id")   # wires the guards; validates models
 
-async with async_session() as session:
-    pv.bind(session, Context(user_id=42, tenant_id=1, roles={"author"}))
-    posts = await session.scalars(select(Post))          # filtered automatically
-    ok    = await pv.authorize(session, "update", post)  # yes/no for one object
+pv = install(Base, policy, strict=True)
 ```
 
-## Core ideas
+Bind the authenticated actor, then use an ordinary SQLAlchemy query:
 
-- **One definition, two forms.** A boolean `ColumnElement` filters a collection
-  (`.where`) and checks one object (`EXISTS`). The database evaluates both.
-- **Tenancy is the session boundary.** One session, one tenant; reads, writes, and
-  attaches are all guarded. See the [threat model](THREAT_MODEL.md).
-- **Secure by default.** Every model is tenant-scoped; `install()` refuses to start
-  if a model lacks its tenant column. `Purview.audit()` flags any model left visible
-  tenant-wide, and `install(warn_on_unfiltered=True)` warns on the documented
-  unfiltered sharp edges.
-- **Inspectable.** `Purview.explain(session, "read", Post)` shows the exact predicate
-  the guard applies — compiled SQL, contributing rules, effective roles — with no
-  database round-trip.
-- **Composable rules.** Role hierarchies (`Policy.role_implies`) and predicate helpers
-  (`owned_by`, `in_values`) keep policies declarative.
+```python
+async with sessions() as session:
+    pv.bind(session, Context(user_id=42, tenant_id=1, roles={"author"}))
+    posts = (await session.scalars(select(Post))).all()
+```
 
-## Learn more
+[Run the complete SQLite example →](quickstart.md)
 
-- [Design](DESIGN.md) — the architecture and the keystone idea.
-- [Threat model](THREAT_MODEL.md) — what is and isn't enforced, each guarantee mapped
-  to its test.
-- [Migrating from Oso](MIGRATING_FROM_OSO.md).
-- [API reference](reference.md).
-- [Example app](https://github.com/jestatsio/purview/tree/main/examples/tracker) — a
-  multi-tenant tracker (FastAPI + Alembic + Postgres) exercising every feature.
+<div class="pv-flow" role="img" aria-label="An authenticated actor's context is combined with tenant and policy predicates to produce filtered SQL rows">
+  <div class="pv-flow-step"><strong>Actor context</strong><span>User · tenant · roles</span></div>
+  <span class="pv-flow-arrow" aria-hidden="true">→</span>
+  <div class="pv-flow-step"><strong>Tenant + policy</strong><span>SQLAlchemy predicates</span></div>
+  <span class="pv-flow-arrow" aria-hidden="true">→</span>
+  <div class="pv-flow-step"><strong>Filtered SQL</strong><span>Rows the actor may read</span></div>
+</div>
+
+## Small API. Explicit boundaries.
+
+Reads filter automatically on bound sessions. For writes, your application calls
+`authorize()` before update or delete and `validate_create()` for create rules.
+The normal ORM flush guard handles tenant stamping and cross-tenant checks.
+
+The examples use `strict=True` to deny reads when a scoped model has no rule.
+The default mode allows tenant-wide reads for such models. Raw SQL, bulk DML,
+unbound sessions, and bypass blocks are outside automatic enforcement.
+
+[Understand the security boundary →](THREAT_MODEL.md)
+
+## Find your next step
+
+| You want to… | Read |
+| --- | --- |
+| Install the right database driver | [Installation](installation.md) |
+| See a working example end to end | [Quickstart](quickstart.md) |
+| Add roles, create rules, or custom tenant fields | [Writing policies](policies.md) |
+| Bind an actor to every API request | [FastAPI integration](fastapi.md) |
+| Understand a denied request or an open model | [Debugging policies](debugging.md) |
+| Bring an existing Polar policy | [Migrating from Oso](MIGRATING_FROM_OSO.md) |
+| Check signatures and available methods | [API reference](reference.md) |

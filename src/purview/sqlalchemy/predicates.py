@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import ColumnElement, false, true
+from sqlalchemy import ColumnElement, false, inspect, true
 
 from purview.core.actions import READ
 from purview.core.combine import evaluate_predicate
@@ -23,8 +23,29 @@ from purview.core.registry import Policy
 _FALSE_TYPE = type(false())
 
 
+def governing_model(model: type) -> type:
+    """The base mapper governing single-table and joined-table inheritance."""
+    mapper: Any = inspect(model, raiseerr=False)
+    return mapper.base_mapper.class_ if mapper is not None else model
+
+
+def scope_predicate(
+    policy: Policy,
+    ctx: Context[Any, Any],
+    model: type,
+    tenant_column: str,
+) -> ColumnElement[bool]:
+    """Tenant scope for the governing model, or no scope for global models."""
+    model = governing_model(model)
+    if policy.is_global(model):
+        return true()
+    column = policy.tenant_field_for(model, tenant_column)
+    return tenant_predicate(model, column, ctx.tenant_id)
+
+
 def governing_action(policy: Policy, model: type, action: str) -> str:
     """The action whose rules govern ``action`` — itself if it has rules, else READ."""
+    model = governing_model(model)
     return action if policy.has_rules(model, action) else READ
 
 
@@ -41,6 +62,7 @@ def row_predicate(
     default, or denied (``false()``) under ``strict`` — tenant scope applies
     either way.
     """
+    model = governing_model(model)
     gov = governing_action(policy, model, action)
     if policy.has_rules(model, gov):
         return evaluate_predicate(policy, ctx, model, gov)

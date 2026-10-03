@@ -4,19 +4,68 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
 
 jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v8.3.2
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install locked dependencies
+        run: uv sync --locked --all-extras
+      - name: Lint and format
+        run: |
+          uv run --locked --all-extras ruff check .
+          uv run --locked --all-extras ruff format --check .
+      - name: Type-check
+        run: uv run --locked --all-extras mypy
+      - name: Build documentation
+        run: uv run --locked --all-extras mkdocs build --strict
+      - name: Run the documented quickstart
+        run: uv run --locked --all-extras python examples/quickstart.py
+      - name: Validate release notes
+        if: github.ref_type == 'tag'
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: uv run --locked --all-extras python scripts/release_notes.py "$RELEASE_TAG" "$RUNNER_TEMP/release-notes.md"
+      - name: Build and check distributions
+        run: |
+          uv build
+          uvx twine check --strict dist/*
+          uv build --wheel --out-dir "$RUNNER_TEMP/from-sdist" dist/*.tar.gz
+      - name: Install wheel in a clean environment
+        env:
+          RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+        run: |
+          uv venv "$RUNNER_TEMP/purview-wheel"
+          wheels=(dist/*.whl)
+          uv pip install --python "$RUNNER_TEMP/purview-wheel/bin/python" "${wheels[0]}[fastapi,sqlite,postgres]"
+          "$RUNNER_TEMP/purview-wheel/bin/python" scripts/check_install.py
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+
   test:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.11", "3.12", "3.13", "3.14"]
-
     services:
       postgres:
         image: postgres:16
@@ -30,24 +79,18 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-
     env:
       UV_PYTHON: ${{ matrix.python-version }}
       PURVIEW_TEST_POSTGRES_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/purview_test
-
     steps:
       - uses: actions/checkout@v7
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v8.3.2
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v8.3.2
         with:
           python-version: ${{ matrix.python-version }}
-
-      - name: Lint
-        run: uv run --extra dev ruff check .
-
-      - name: Type-check (strict)
-        run: uv run --extra dev mypy
-
-      - name: Test (SQLite + Postgres) with coverage gate
-        run: uv run --extra dev pytest --cov=purview --cov-report=term-missing --cov-fail-under=90
+          enable-cache: true
+      - name: Install locked dependencies
+        run: uv sync --locked --all-extras
+      - name: Test SQLite, PostgreSQL, and the tracker
+        run: uv run --locked --all-extras pytest tests examples/tracker/test_smoke.py --cov=purview --cov-report=term-missing --cov-fail-under=90

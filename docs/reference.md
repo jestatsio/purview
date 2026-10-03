@@ -1,6 +1,25 @@
-# API Reference
+# API reference
 
-The public surface, generated from the source docstrings.
+The public API, generated directly from source docstrings. Start with
+[installation](installation.md) and the [quickstart](quickstart.md) for a runnable
+setup, or see [writing policies](policies.md) for action semantics.
+
+Import the core types from `purview`, the enforcement adapter from
+`purview.sqlalchemy`, and the optional web adapter from `purview.fastapi`.
+
+| Task | API |
+| --- | --- |
+| Register read or action rules | `Policy.rule()` |
+| Register proposed-object checks | `Policy.create_rule()` |
+| Install and bind session guards | `install()`, `Purview.bind()` |
+| Check an existing row or ID set | `Purview.authorize()`, `Purview.authorized_ids()` |
+| Validate a proposed object | `Purview.validate_create()` |
+| Inspect policy behavior | `Purview.explain()`, `Purview.audit()` |
+| Bind a FastAPI request | `context_binder()` |
+
+`READ`, `CREATE`, `UPDATE`, and `DELETE` are string action constants. Action checks
+without registered rules fall back to `READ`. Create rules use the separate
+`create_rule()` / `validate_create()` API.
 
 ## Core
 

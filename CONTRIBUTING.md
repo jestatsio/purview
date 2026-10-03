@@ -1,47 +1,60 @@
-# Contributing
+# Contributing to Purview
 
-Thanks for your interest in Purview. This is a security-sensitive library, so the
-bar is **correctness and clarity over features** — and the default is always deny.
+Purview handles authorization and tenant isolation. Changes should make its behavior
+more predictable, easier to inspect, and harder to misuse.
 
-## Development setup
+## Set up a checkout
 
-Purview uses [uv](https://docs.astral.sh/uv/); no manual virtualenv is needed:
-
-```bash
-uv run --extra dev pytest          # unit + integration + the example app
-uv run --extra dev mypy            # strict typing is a project invariant
-uv run --extra dev ruff check .    # lint
-uv run --extra dev ruff format .   # format
-```
-
-### Running against Postgres
-
-The integration suite parametrizes over SQLite and Postgres. SQLite runs by
-default; to include Postgres, point `PURVIEW_TEST_POSTGRES_URL` at a database:
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and Python
+3.11 or newer, then run:
 
 ```bash
-export PURVIEW_TEST_POSTGRES_URL=postgresql+asyncpg://user:pass@localhost/purview_test
-uv run --extra dev pytest tests/integration
+git clone https://github.com/jestatsio/purview.git
+cd purview
+uv sync --locked --all-extras
 ```
 
-## Expectations for changes
+This installs the local package, test tools, documentation tools, database drivers,
+and tracker dependencies into `.venv`.
 
-- **Tests first for behaviour changes.** New enforcement behaviour needs a test
-  that fails without the change. Leak-prevention tests belong in
-  [`tests/integration/test_adversarial.py`](tests/integration/test_adversarial.py)
-  and should be framed as an attacker trying to cross the tenant boundary.
-- **`mypy --strict` and `ruff` must pass.** Type-correctness is a feature here.
-- **Keep the core pure.** `purview.core` must not import the ORM-execution or web
-  layers — that separation is what keeps policy logic unit-testable.
-- **Default deny.** Anything that could widen access by accident is a bug, not a
-  convenience.
+## Validate a change
 
-## Commit messages
+```bash
+uv run --locked --all-extras ruff check .
+uv run --locked --all-extras ruff format --check .
+uv run --locked --all-extras mypy
+uv run --locked --all-extras pytest tests examples/tracker/test_smoke.py --cov=purview --cov-fail-under=90
+uv run --locked --all-extras python examples/quickstart.py
+uv run --locked --all-extras mkdocs build --strict
+```
 
-[Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`,
-`test:`, `docs:`, `ci:`, `refactor:`, `chore:`.
+Use `ruff format .` to apply formatting. Preview documentation with
+`uv run --locked --all-extras mkdocs serve`.
 
-## Releases
+SQLite tests work without a database server. For the PostgreSQL suite, point
+`PURVIEW_TEST_POSTGRES_URL` at a **dedicated, disposable test database**:
 
-Maintainers cut releases by pushing a `v*` tag — see [RELEASING.md](RELEASING.md).
-The version is derived from the tag; there is nothing to bump by hand.
+```bash
+export PURVIEW_TEST_POSTGRES_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/purview_test
+uv run --locked --all-extras pytest tests examples/tracker/test_smoke.py
+```
+
+The integration fixtures recreate their tables in that database. The tracker tests
+use temporary SQLite files and separate PostgreSQL schemas. They ignore the demo's
+`DATABASE_URL`. CI runs both backends on Python 3.11, 3.12, 3.13, and 3.14.
+
+## Expectations
+
+- Add a failing regression before fixing enforcement behavior. Test both an allowed
+  operation and the denied or cross-tenant case.
+- Keep `purview.core` free of ORM execution and web-framework imports.
+- Keep checks and query filtering consistent. Document defaults accurately:
+  registered read rules deny when they return no grants, while scoped models with
+  no read rule remain tenant-wide unless `strict=True` is enabled.
+- Make changes to public behavior visible in `CHANGELOG.md` and the relevant guide.
+- Keep dependency changes in `pyproject.toml` and regenerate `uv.lock` with `uv lock`.
+  Use `uv lock --upgrade` for a deliberate refresh, then run the full checks.
+- Report vulnerabilities through [private security reporting](SECURITY.md).
+
+Use conventional commit prefixes such as `fix:`, `feat:`, `docs:`, `test:`, and
+`ci:`. See [RELEASING.md](RELEASING.md) for the maintainer release process.

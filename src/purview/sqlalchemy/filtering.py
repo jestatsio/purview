@@ -8,6 +8,7 @@ subquery, or running off a session that is not context-bound.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any
 
 from sqlalchemy import Select, select
@@ -15,7 +16,7 @@ from sqlalchemy import Select, select
 from purview.core.actions import READ
 from purview.core.context import Context
 from purview.core.registry import Policy
-from purview.sqlalchemy.predicates import row_predicate, tenant_predicate
+from purview.sqlalchemy.predicates import row_predicate, scope_predicate
 
 
 def authorized_select(
@@ -30,8 +31,8 @@ def authorized_select(
     Applies tenant scope and the read predicate explicitly. On a bound session
     the guard would apply equivalent criteria too; the duplication is harmless.
     """
-    column = policy.tenant_field_for(model, tenant_column)
+    ctx = replace(ctx, roles=policy.expand_roles(ctx.roles))
     return select(model).where(
-        tenant_predicate(model, column, ctx.tenant_id),
+        scope_predicate(policy, ctx, model, tenant_column),
         row_predicate(policy, ctx, model, READ, strict),
     )

@@ -1,9 +1,8 @@
-# Purview Tracker — dogfood example
+# Purview Tracker
 
 A small multi-tenant project tracker — **FastAPI + SQLAlchemy 2.0 async + Alembic +
-Postgres**, wired with [Purview](https://github.com/jestatsio/purview). It's the
-real-app proof that Purview works on a realistic schema: every 0.2 capability is
-exercised here, not just in unit tests.
+Postgres**, wired with [Purview](https://github.com/jestatsio/purview). The same
+policy filters task lists, checks updates, and validates project creation.
 
 | Capability | Where |
 |---|---|
@@ -16,42 +15,71 @@ exercised here, not just in unit tests.
 
 ## Run
 
+Start with Python 3.11+, [uv](https://docs.astral.sh/uv/), and a local PostgreSQL
+server. Install the current checkout and its example tools from the repository root:
+
 ```bash
+git clone https://github.com/jestatsio/purview.git
+cd purview
+uv sync --all-extras --locked
+source .venv/bin/activate
 cd examples/tracker
-pip install -r requirements.txt
 
 createdb tracker
 export DATABASE_URL=postgresql+asyncpg://localhost/tracker
 
-alembic upgrade head            # create the schema (real migration)
-python -m tracker.seed          # demo data
+alembic upgrade head
+python -m tracker.seed
 uvicorn tracker.app:app --reload
 ```
 
-Identify yourself with the `X-Workspace-Id` / `X-User-Id` headers (a stand-in for
-your real auth). For example, alice is a *member* of workspace 1, so she only sees
-her own tasks:
+On Windows, activate the environment with `.venv\Scripts\Activate.ps1` and set
+`$env:DATABASE_URL` in PowerShell. Adjust the database URL for your local PostgreSQL
+user and password. Seed a newly created database once.
+
+Open <http://127.0.0.1:8000/docs> to explore the API. The `X-Workspace-Id` and
+`X-User-Id` headers are a demo identity mechanism. Production applications should
+derive these values from an authenticated session or verified token.
+
+Alice is a *member* of workspace 1, so she only sees her own tasks:
 
 ```bash
-curl -s localhost:8000/tasks \
+curl -s http://127.0.0.1:8000/tasks \
   -H "X-Workspace-Id: 00000000-0000-0000-0000-000000000001" \
-  -H "X-User-Id:      00000000-0000-0000-0000-00000000000b"   # alice
+  -H "X-User-Id: 00000000-0000-0000-0000-00000000000b"
 ```
 
-while dave (an *admin* of workspace 1) sees every task in the workspace — same route,
-same query, different rows, all from one policy definition.
+The response contains `alice-task`. Change the user ID to
+`00000000-0000-0000-0000-00000000000e` for Dave, an admin who also sees `bob-task`.
+The route and query are identical. The policy determines which rows are visible.
+
+Create and update payloads use Pydantic models. Missing fields, invalid UUIDs,
+empty names or titles, and values longer than their database columns return HTTP
+422 before a write occurs.
 
 ## Test
 
-With `DATABASE_URL` set and the schema migrated:
+From the repository root:
 
 ```bash
-pytest test_smoke.py
+uv run --locked --all-extras pytest examples/tracker/test_smoke.py
 ```
 
-The smoke test seeds two workspaces and asserts — over real HTTP — tenant isolation,
-the read/create rules, the composite-PK and per-model-column models, and cross-tenant
-404s.
+The HTTP tests seed two workspaces in a temporary SQLite database. They cover tenant
+isolation, read/create rules, composite keys, per-model tenant columns, cross-tenant
+404s, and request validation. They do not connect to the demo's `DATABASE_URL`.
+
+To run the same tests against PostgreSQL as well, use a test database whose user can
+create schemas:
+
+```bash
+createdb purview_test
+export PURVIEW_TEST_POSTGRES_URL=postgresql+asyncpg://localhost/purview_test
+uv run --locked --all-extras pytest examples/tracker/test_smoke.py
+```
+
+Each PostgreSQL test creates and removes a uniquely named schema. No pre-existing
+tables are dropped, and no migration or manual seed step is needed for the tests.
 
 ## How it's wired
 

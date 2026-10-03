@@ -22,7 +22,7 @@ from purview.core.actions import READ
 from purview.core.registry import Policy
 from purview.exceptions import PurviewWarning
 from purview.sqlalchemy.binding import context_of
-from purview.sqlalchemy.bypass import is_bypassed
+from purview.sqlalchemy.bypass import _CHECK_EXECUTION_OPTION, is_bypassed
 from purview.sqlalchemy.predicates import row_predicate, tenant_predicate
 
 
@@ -42,7 +42,7 @@ def make_read_guard(
     """
 
     def read_guard(state: ORMExecuteState) -> None:
-        if is_bypassed():
+        if is_bypassed() or state.execution_options.get(_CHECK_EXECUTION_OPTION):
             return
         ctx = context_of(state.session)
         if ctx is None:
